@@ -56,7 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
                 password,
                 nickname,
                 restaurantName,
-                role: 'admin',
+                role: 'owner',
             });
             setTokens(data.accessToken, data.refreshToken);
             set({ user: data.user, restaurant: data.restaurant, isLoading: false });
