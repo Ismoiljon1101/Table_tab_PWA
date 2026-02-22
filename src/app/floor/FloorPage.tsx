@@ -8,7 +8,6 @@ import { useCartStore } from '../../stores/cartStore';
 import { UserRole, TableStatus } from '../../types/enums';
 import type { Table } from '../../types';
 import api from '../../services/api';
-import './FloorPage.css';
 
 /**
  * Floor plan page — the primary view for waiters.
@@ -91,64 +90,64 @@ export function FloorPage() {
     /** Get status color class */
     const getStatusClass = (status: TableStatus): string => {
         switch (status) {
-            case TableStatus.AVAILABLE: return 'floor-table--available';
-            case TableStatus.OCCUPIED: return 'floor-table--occupied';
-            case TableStatus.RESERVED: return 'floor-table--reserved';
-            default: return '';
+            case TableStatus.AVAILABLE: return 'border-emerald-200 bg-gradient-to-b from-emerald-50 to-white';
+            case TableStatus.OCCUPIED: return 'border-amber-200 bg-gradient-to-b from-amber-50 to-white';
+            case TableStatus.RESERVED: return 'border-blue-200 bg-gradient-to-b from-blue-50 to-white';
+            default: return 'border-stone-200 bg-white';
         }
     };
 
     if (loading) {
         return (
-            <div className="floor-loading">
-                <div className="floor-loading__spinner" />
+            <div className="flex flex-col items-center justify-center min-h-[300px] gap-3 text-stone-400">
+                <div className="w-8 h-8 rounded-full border-4 border-stone-200 border-t-amber-600 animate-spin" />
                 <p>Loading floor plan...</p>
             </div>
         );
     }
 
     return (
-        <div className="floor-page">
+        <div className="p-4">
             {/* Stats bar */}
-            <div className="floor-stats">
-                <div className="floor-stat">
-                    <span className="floor-stat__dot floor-stat__dot--available" />
+            <div className="flex bg-white gap-4 p-3 rounded-xl shadow-sm mb-4 border border-stone-100">
+                <div className="flex items-center gap-2 text-sm text-stone-600 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-emerald-600" />
                     <span>{tables.filter((t) => t.status === TableStatus.AVAILABLE).length} Free</span>
                 </div>
-                <div className="floor-stat">
-                    <span className="floor-stat__dot floor-stat__dot--occupied" />
+                <div className="flex items-center gap-2 text-sm text-stone-600 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-amber-600" />
                     <span>{tables.filter((t) => t.status === TableStatus.OCCUPIED).length} Occupied</span>
                 </div>
-                <div className="floor-stat">
-                    <span className="floor-stat__dot floor-stat__dot--reserved" />
+                <div className="flex items-center gap-2 text-sm text-stone-600 font-medium">
+                    <span className="w-2 h-2 rounded-full bg-blue-600" />
                     <span>{tables.filter((t) => t.status === TableStatus.RESERVED).length} Reserved</span>
                 </div>
             </div>
 
             {/* Table Grid */}
             {tables.length === 0 ? (
-                <div className="floor-empty">
-                    <Users size={48} color="var(--text-muted)" />
-                    <h3>No tables yet</h3>
-                    <p>Add tables to get started</p>
+                <div className="flex flex-col items-center gap-3 py-16 px-4 text-center">
+                    <Users size={48} className="text-stone-400" />
+                    <h3 className="text-lg font-semibold text-stone-900">No tables yet</h3>
+                    <p className="text-stone-500 mb-2">Add tables to get started</p>
                     {isAdmin && (
                         <Button variant="primary" onClick={() => navigate('/settings')}>
-                            <Plus size={18} /> Add Tables
+                            <Plus size={18} className="mr-2" /> Add Tables
                         </Button>
                     )}
                 </div>
             ) : (
-                <div className="floor-grid">
+                <div className="grid grid-cols-2 gap-3">
                     {tables.map((table, idx) => (
                         <button
                             key={table._id}
-                            className={`floor-table ${getStatusClass(table.status)}`}
+                            className={`flex flex-col items-center gap-2 p-5 rounded-2xl border-2 shadow-sm transition-all duration-200 active:scale-95 animate-[scaleIn_0.3s_ease-out_backwards] ${getStatusClass(table.status)}`}
                             style={{ animationDelay: `${idx * 40}ms` }}
                             onClick={() => handleTableTap(table)}
                         >
-                            <span className="floor-table__name">{table.displayName || table.name}</span>
+                            <span className="text-xl font-bold text-stone-900">{table.displayName || table.name}</span>
                             <Badge label={table.status} variant={table.status} />
-                            <span className="floor-table__capacity">
+                            <span className="flex items-center gap-1.5 text-xs text-stone-500 mt-1">
                                 <Users size={12} /> {table.capacity}
                             </span>
                         </button>
@@ -158,30 +157,30 @@ export function FloorPage() {
 
             {/* Action Sheet for occupied table */}
             {actionTable && (
-                <div className="action-overlay" onClick={() => setActionTable(null)}>
-                    <div className="action-sheet animate-slide-up" onClick={(e) => e.stopPropagation()}>
-                        <div className="action-sheet__handle" />
-                        <h3 className="action-sheet__title">
+                <div className="fixed inset-0 bg-black/40 z-[200] flex items-end justify-center animate-fade-in" onClick={() => setActionTable(null)}>
+                    <div className="w-full max-w-[480px] bg-white rounded-t-3xl p-5 pb-[calc(24px+env(safe-area-inset-bottom))] animate-slide-up" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-9 h-1 rounded-full bg-stone-300 mx-auto mb-5" />
+                        <h3 className="text-xl font-bold text-center mb-1 text-stone-900">
                             {actionTable.displayName || actionTable.name}
                         </h3>
-                        <p className="action-sheet__desc">This table has an active order</p>
+                        <p className="text-sm text-stone-500 text-center mb-6">This table has an active order</p>
 
-                        <div className="action-sheet__actions">
-                            <button className="action-btn action-btn--primary" onClick={handleAddMenu}>
-                                <span className="action-btn__emoji">📋</span>
+                        <div className="flex flex-col gap-2">
+                            <button className="flex items-center gap-3 w-full p-4 rounded-xl bg-amber-50 text-amber-700 font-semibold transition-all duration-200 active:scale-95 active:bg-amber-100" onClick={handleAddMenu}>
+                                <span className="text-xl">📋</span>
                                 <span>Add Menu Items</span>
                             </button>
-                            <button className="action-btn" onClick={handleNewCustomer}>
-                                <span className="action-btn__emoji">👋</span>
+                            <button className="flex items-center gap-3 w-full p-4 rounded-xl bg-stone-50 border border-stone-100 text-stone-800 font-medium transition-all duration-200 active:scale-95 active:bg-stone-100" onClick={handleNewCustomer}>
+                                <span className="text-xl">👋</span>
                                 <span>New Customer</span>
                             </button>
-                            <button className="action-btn action-btn--danger" onClick={handleCancelOrder}>
-                                <span className="action-btn__emoji">❌</span>
+                            <button className="flex items-center gap-3 w-full p-4 rounded-xl bg-stone-50 border border-stone-100 text-red-600 font-medium transition-all duration-200 active:scale-95 active:bg-red-50" onClick={handleCancelOrder}>
+                                <span className="text-xl">❌</span>
                                 <span>Cancel Order</span>
                             </button>
                         </div>
 
-                        <button className="action-sheet__cancel" onClick={() => setActionTable(null)}>
+                        <button className="w-full mt-4 p-3 text-stone-500 font-medium rounded-xl active:bg-stone-50 transition-colors" onClick={() => setActionTable(null)}>
                             Close
                         </button>
                     </div>
