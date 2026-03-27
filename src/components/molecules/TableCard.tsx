@@ -58,23 +58,17 @@ export function TableCard({
     const statusClass = STATUS_CLASSES[table.status] ?? 'border-stone-200 bg-white text-stone-700';
 
     /**
-     * Normalize size:
-     * We follow a 1-unit-per-2-people rule:
-     * - 1-2 people -> 1x1
-     * - 3-4 people -> 2x1
-     * - 5-6 people -> 3x1
-     * - 7-8 people -> 4x1
-     * 
-     * If width/height already exist as valid grid units (and aren't the 2x1 default), 
-     * we respect them to allow manual overrides later.
+     * Responsive sizing logic:
+     * - Base (2 people): 1.0 unit
+     * - Every extra 2 people adds 0.6 units of width (instead of 1.0).
+     * This makes larger tables look sleeker and more professional.
      */
-    const cap = table.capacity ?? 4;
-    const defaultW = cap <= 2 ? 1 : cap <= 4 ? 2 : cap <= 6 ? 3 : 4;
-    const defaultH = 1;
-
-    // Treat any value > 6 as legacy (px intent) and replace with capacity-derived default
-    const safeW = (table.width ?? 2) > 6 ? defaultW : (table.width ?? defaultW);
-    const safeH = (table.height ?? 1) > 6 ? defaultH : (table.height ?? defaultH);
+    const cap = table.capacity ?? 2;
+    const floatW = 1 + (Math.max(0, cap - 2) / 2) * 0.6;
+    
+    // Width is capacity-driven; Height is standard 1.0 unit.
+    const safeW = floatW;
+    const safeH = 1;
 
     const gridStyle: React.CSSProperties = {
         position: 'absolute',
