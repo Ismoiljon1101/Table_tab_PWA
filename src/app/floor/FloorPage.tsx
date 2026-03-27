@@ -148,11 +148,15 @@ export function FloorPage() {
         ? tables.filter(t => mongoIdsMatch(t.section, selectedSectionId))
         : tables;
 
-    /** Optimistically update a table's position in local state after drag-drop */
-    const handleTableMoved = (tableId: string, x: number, y: number) => {
+    /** Optimistically update a table in local state */
+    const handleTableUpdate = (tableId: string, updates: Partial<Table>) => {
         setTables(prev => prev.map(t =>
-            t._id === tableId ? { ...t, position: { x, y } } : t
+            t._id === tableId ? { ...t, ...updates } : t
         ));
+    };
+
+    const handleTableMoved = (tableId: string, x: number, y: number) => {
+        handleTableUpdate(tableId, { position: { x, y } });
     };
 
     console.log('[FloorPage] RENDER - Tables:', tables.length, 'Sections:', sections.length);
@@ -230,6 +234,7 @@ export function FloorPage() {
                         onTableTap={handleTableTap}
                         onAddTables={() => navigate('/settings')}
                         onTableMoved={handleTableMoved}
+                        onTableUpdate={handleTableUpdate}
                     />
                 )}
 

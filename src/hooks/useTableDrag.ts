@@ -22,22 +22,20 @@ interface UseTableDragOptions {
     panRef: React.RefObject<{ x: number; y: number }>;
     /** Called when a drag completes, with the new grid position */
     onDropped: (tableId: string, gridX: number, gridY: number) => Promise<void>;
+    /** Called when a 1-second static hold is detected (Rotation) */
+    onRotate?: (table: Table) => void;
 }
 
 /**
  * useTableDrag
  * Manages long-press → drag → drop for admin table repositioning.
- * - 500ms hold on a table enters drag mode.
- * - Dragging shows the table at the pointer position (follows finger).
- * - On release, the grid coordinate is computed and saved via onDropped().
- *
- * CRITICAL: When drag activates, we capture the pointer on the canvas
- * so that ALL subsequent pointermove/pointerup events fire on the canvas,
- * even if the finger moves off the table element.
+ * - 500ms hold: Enter drag mode.
+ * - 1000ms hold (without moving): Trigger rotation.
  */
-export function useTableDrag({ canvasRef, panRef, onDropped }: UseTableDragOptions) {
+export function useTableDrag({ canvasRef, panRef, onDropped, onRotate }: UseTableDragOptions) {
     const [dragging, setDragging] = useState<DragState | null>(null);
     const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const rotateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pressPosRef = useRef<{ x: number; y: number } | null>(null);
     const pointerIdRef = useRef<number | null>(null);
 
@@ -45,29 +43,44 @@ export function useTableDrag({ canvasRef, panRef, onDropped }: UseTableDragOptio
     const onTableTouchStart = useCallback((table: Table, clientX: number, clientY: number, pointerId: number) => {
         pressPosRef.current = { x: clientX, y: clientY };
         pointerIdRef.current = pointerId;
+
+        // Stage 1: Drag Activation (500ms)
         longPressTimer.current = setTimeout(() => {
             setDragging({ table, screenX: clientX, screenY: clientY });
-            // Capture the pointer on the canvas so ALL future events route there
+            
             if (canvasRef.current && pointerIdRef.current !== null) {
                 try {
                     canvasRef.current.setPointerCapture(pointerIdRef.current);
-                } catch { /* pointer may have been released already */ }
+                } catch { /* ignored */ }
             }
+
+            // Stage 2: Rotation Trigger (Another 500ms, total 1000ms)
+            rotateTimer.current = setTimeout(() => {
+                // Only trigger if we are still dragging AND haven't moved much
+                if (onRotate) {
+                    onRotate(table);
+                    setDragging(null); // Reset dragging to avoid conflict with alert/modal
+                }
+            }, 500);
         }, LONG_PRESS_MS);
-    }, [canvasRef]);
+    }, [canvasRef, onRotate]);
 
     /**
      * Cancel the long-press only if the user moves significantly (>10px).
      * Prevents accidental cancellations from finger micro-shaking on mobile.
      */
     const handleMove = useCallback((clientX: number, clientY: number) => {
-        if (!pressPosRef.current || !longPressTimer.current) return;
+        if (!pressPosRef.current || (!longPressTimer.current && !rotateTimer.current)) return;
         const dx = clientX - pressPosRef.current.x;
         const dy = clientY - pressPosRef.current.y;
         if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
             if (longPressTimer.current) {
                 clearTimeout(longPressTimer.current);
                 longPressTimer.current = null;
+            }
+            if (rotateTimer.current) {
+                clearTimeout(rotateTimer.current);
+                rotateTimer.current = null;
             }
         }
     }, []);
@@ -78,6 +91,10 @@ export function useTableDrag({ canvasRef, panRef, onDropped }: UseTableDragOptio
             clearTimeout(longPressTimer.current);
             longPressTimer.current = null;
         }
+        if (rotateTimer.current) {
+            clearTimeout(rotateTimer.current);
+            rotateTimer.current = null;
+        }
         pressPosRef.current = null;
         pointerIdRef.current = null;
     }, []);
@@ -85,6 +102,16 @@ export function useTableDrag({ canvasRef, panRef, onDropped }: UseTableDragOptio
     /** Update drag position during move — table follows finger */
     const onDragMove = useCallback((clientX: number, clientY: number) => {
         setDragging(prev => prev ? { ...prev, screenX: clientX, screenY: clientY } : null);
+
+        // If we move more than 10px from start, cancel the rotation timer
+        if (rotateTimer.current && pressPosRef.current) {
+            const dx = clientX - pressPosRef.current.x;
+            const dy = clientY - pressPosRef.current.y;
+            if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                clearTimeout(rotateTimer.current);
+                rotateTimer.current = null;
+            }
+        }
     }, []);
 
     /**

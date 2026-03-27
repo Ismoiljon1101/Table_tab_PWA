@@ -7,6 +7,7 @@ import { MenuPage } from './app/menu/MenuPage';
 import { OrdersPage } from './app/orders/OrdersPage';
 import { SettingsPage } from './app/settings/SettingsPage';
 import { AdminPage } from './app/admin';
+import { NotificationsPage } from './app/notifications/NotificationsPage';
 import { useAuthStore } from './stores/authStore';
 
 /**
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/orders" element={<OrdersPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/admin/manage" element={<AdminPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
         </Route>
 
         {/* Fallback */}

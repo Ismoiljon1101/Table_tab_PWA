@@ -1,5 +1,5 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom';
-import { LayoutGrid, ClipboardList, Settings } from 'lucide-react';
+import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { LayoutGrid, ClipboardList, Settings, Bell } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { useCartStore } from '../../stores/cartStore';
 
@@ -12,6 +12,7 @@ export function AppShell() {
     const restaurant = useAuthStore((s) => s.restaurant);
     const cartCount = useCartStore((s) => s.totalItems());
     const location = useLocation();
+    const navigate = useNavigate();
 
     const currentFloorName = useAuthStore((s) => s.currentFloorName);
     const isFloorPage = location.pathname === '/';
@@ -20,16 +21,18 @@ export function AppShell() {
         if (location.pathname.startsWith('/menu')) return 'Menu';
         if (location.pathname.startsWith('/orders')) return 'Orders';
         if (location.pathname.startsWith('/settings')) return 'Settings';
+        if (location.pathname.startsWith('/notifications')) return 'Notifications';
         if (isFloorPage && currentFloorName) return currentFloorName;
         return restaurant?.name || 'TableTap';
     };
 
     const isManagementPage = location.pathname.startsWith('/admin/manage');
+    const isNotificationsPage = location.pathname === '/notifications';
 
     return (
         <div className="flex flex-col h-[100dvh] max-w-[480px] mx-auto bg-orange-50 relative overflow-hidden">
             {/* Header - Fixed 8% of Viewport Height (Hidden on Management) */}
-            {!isManagementPage && (
+            {!isManagementPage && !isNotificationsPage && (
                 <header className="h-[8vh] flex items-center px-4 bg-white/80 backdrop-blur-md border-b border-stone-100 gap-3 z-50">
                     <h1 className="flex-1 text-lg font-bold text-stone-900 truncate">
                         {getTitle()}
@@ -44,12 +47,14 @@ export function AppShell() {
                         </NavLink>
                     )}
 
-                    <div
-                        className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center text-sm font-bold flex-shrink-0"
-                        title={user?.nickname || ''}
+                    <button
+                        className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-stone-50 text-stone-400 active:bg-stone-100 active:text-amber-600 transition-all group"
+                        title="Notifications"
+                        onClick={() => navigate('/notifications')}
                     >
-                        {user?.nickname?.charAt(0).toUpperCase() || 'U'}
-                    </div>
+                        <Bell size={20} strokeWidth={2.5} className="group-active:scale-110 transition-transform" />
+                        <span className="absolute top-2 right-2 w-2 h-2 bg-amber-600 rounded-full border-2 border-white animate-pulse" />
+                    </button>
                 </header>
             )}
 

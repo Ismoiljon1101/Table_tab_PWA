@@ -6,45 +6,57 @@ import type { MenuItem, Category } from '../../types';
 import { formatCurrency } from '../../utils/format';
 import api from '../../services/api';
 import { ItemFormModal } from './ItemFormModal';
+import { CategoryChips } from '../molecules/CategoryChips';
+
+interface MenuItemManagementProps {
+    selectedCategoryProp?: string;
+    onSelectCategoryProp?: (id: string) => void;
+}
 
 /**
  * MenuItemManagement component
  * Handles CRUD operations for menu items.
  */
-export const MenuItemManagement = forwardRef<{ handleAdd: () => void }, {}>(({}, ref) => {
-    const [items, setItems] = useState<MenuItem[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [selectedCategory, setSelectedCategory] = useState<string>('all');
-    const [loading, setLoading] = useState(true);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+export const MenuItemManagement = forwardRef<{ handleAdd: () => void }, MenuItemManagementProps>(
+    ({ selectedCategoryProp, onSelectCategoryProp }, ref) => {
+        const [items, setItems] = useState<MenuItem[]>([]);
+        const [categories, setCategories] = useState<Category[]>([]);
+        const [internalSelectedCategory, setInternalSelectedCategory] = useState<string>('all');
+        const [loading, setLoading] = useState(true);
+        const [isModalOpen, setIsModalOpen] = useState(false);
+        const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
-    useImperativeHandle(ref, () => ({
-        handleAdd: () => {
-            setEditingItem(null);
-            setIsModalOpen(true);
-        }
-    }));
+        // Sync with props or use internal state
+        const selectedCategory = selectedCategoryProp || internalSelectedCategory;
+        const setSelectedCategory = onSelectCategoryProp || setInternalSelectedCategory;
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+        useImperativeHandle(ref, () => ({
+            handleAdd: () => {
+                setEditingItem(null);
+                setIsModalOpen(true);
+            }
+        }));
 
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            const [itemRes, catRes] = await Promise.all([
-                api.get<MenuItem[]>('/menu'),
-                api.get<Category[]>('/categories'),
-            ]);
-            setItems(itemRes.data);
-            setCategories(catRes.data);
-        } catch (err) {
-            console.error('Failed to fetch menu data:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+        useEffect(() => {
+            fetchData();
+        }, []);
+
+        const fetchData = async () => {
+            try {
+                setLoading(true);
+                const [itemRes, catRes] = await Promise.all([
+                    api.get<MenuItem[]>('/menu'),
+                    api.get<Category[]>('/categories'),
+                ]);
+                setItems(itemRes.data);
+                setCategories(catRes.data);
+            } catch (err) {
+                console.error('Failed to fetch menu data:', err);
+            } finally {
+                setLoading(false);
+            }
+        };
+/* ... (rest of the component remains similar, but using the synchronized selectedCategory) ... */
 
     const handleEdit = (item: MenuItem) => {
         setEditingItem(item);
@@ -90,34 +102,6 @@ export const MenuItemManagement = forwardRef<{ handleAdd: () => void }, {}>(({},
 
     return (
         <div className="flex flex-col gap-4">
-            {/* Category Filter */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                <button
-                    onClick={() => setSelectedCategory('all')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium transition-all whitespace-nowrap ${
-                        selectedCategory === 'all'
-                        ? 'bg-amber-50 border-amber-200 text-amber-700'
-                        : 'bg-white border-stone-100 text-stone-500'
-                    }`}
-                >
-                    <Filter size={12} />
-                    All Items
-                </button>
-                {categories.map((cat) => (
-                    <button
-                        key={cat._id}
-                        onClick={() => setSelectedCategory(cat._id)}
-                        className={`px-3 py-1.5 rounded-full border text-xs font-medium transition-all whitespace-nowrap ${
-                            selectedCategory === cat._id
-                            ? 'bg-amber-50 border-amber-200 text-amber-700'
-                            : 'bg-white border-stone-100 text-stone-500'
-                        }`}
-                    >
-                        {cat.name}
-                    </button>
-                ))}
-            </div>
-
             {filteredItems.length === 0 ? (
                 <div className="bg-white border border-stone-100 rounded-2xl p-10 text-center flex flex-col items-center gap-2">
                     <UtensilsCrossed size={40} className="text-stone-200" />

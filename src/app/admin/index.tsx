@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, LayoutGrid, Tag, UtensilsCrossed, Layout, Plus } from 'lucide-react';
 import { TableManagement } from '../../components/organisms/TableManagement';
@@ -9,6 +9,9 @@ import { AdminDashboardTemplate } from '../../components/templates/AdminDashboar
 import { useAuthStore } from '../../stores/authStore';
 import { UserRole } from '../../types/enums';
 import { Button } from '../../components/atoms/Button';
+import { CategoryChips } from '../../components/molecules/CategoryChips';
+import api from '../../services/api';
+import type { Category } from '../../types';
 
 type AdminTab = 'tables' | 'sections' | 'categories' | 'items';
 
@@ -18,10 +21,12 @@ type AdminTab = 'tables' | 'sections' | 'categories' | 'items';
  */
 export function AdminPage() {
     const [activeTab, setActiveTab] = useState<AdminTab>('tables');
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+    
     const user = useAuthStore((s) => s.user);
     const navigate = useNavigate();
     
-    // Refs to trigger add modals in children
     const tableRef = useRef<{ handleAdd: () => void }>(null);
     const sectionRef = useRef<{ handleAdd: () => void }>(null);
     const categoryRef = useRef<{ handleAdd: () => void }>(null);
@@ -29,11 +34,36 @@ export function AdminPage() {
 
     const isAdmin = user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN;
 
+    useEffect(() => {
+        if (isAdmin) {
+            fetchCategories();
+        }
+    }, [isAdmin]);
+
+    const fetchCategories = async () => {
+        try {
+            const { data } = await api.get<Category[]>('/categories');
+            setCategories(data);
+            if (data.length > 0 && selectedCategoryId === 'all') {
+                setSelectedCategoryId(data[0]._id);
+            }
+        } catch (err) {
+            console.error('Failed to fetch categories:', err);
+        }
+    };
+
     const handleGlobalAdd = () => {
         if (activeTab === 'tables') tableRef.current?.handleAdd();
         if (activeTab === 'sections') sectionRef.current?.handleAdd();
         if (activeTab === 'categories') categoryRef.current?.handleAdd();
         if (activeTab === 'items') itemRef.current?.handleAdd();
+    };
+
+    const handleSelectCategory = (id: string) => {
+        setSelectedCategoryId(id);
+        if (activeTab === 'categories' && id !== 'all') {
+            setActiveTab('items');
+        }
     };
 
     if (!isAdmin) {
@@ -100,11 +130,28 @@ export function AdminPage() {
 
     return (
         <AdminDashboardTemplate header={header} tabs={tabs}>
-            <div className="animate-fade-in" key={activeTab}>
-                {activeTab === 'tables' && <TableManagement ref={tableRef} />}
-                {activeTab === 'sections' && <SectionManagement ref={sectionRef} />}
-                {activeTab === 'categories' && <CategoryManagement ref={categoryRef} />}
-                {activeTab === 'items' && <MenuItemManagement ref={itemRef} />}
+            <div className="flex flex-col gap-4">
+                {activeTab === 'items' && (
+                    <CategoryChips 
+                        categories={categories}
+                        selectedId={selectedCategoryId}
+                        onSelect={handleSelectCategory}
+                        showAll={false}
+                    />
+                )}
+                
+                <div className="animate-fade-in" key={activeTab}>
+                    {activeTab === 'tables' && <TableManagement ref={tableRef} />}
+                    {activeTab === 'sections' && <SectionManagement ref={sectionRef} />}
+                    {activeTab === 'categories' && <CategoryManagement ref={categoryRef} />}
+                    {activeTab === 'items' && (
+                        <MenuItemManagement 
+                            ref={itemRef} 
+                            selectedCategoryProp={selectedCategoryId}
+                            onSelectCategoryProp={setSelectedCategoryId}
+                        />
+                    )}
+                </div>
             </div>
         </AdminDashboardTemplate>
     );

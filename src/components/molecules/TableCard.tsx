@@ -58,17 +58,17 @@ export function TableCard({
     const statusClass = STATUS_CLASSES[table.status] ?? 'border-stone-200 bg-white text-stone-700';
 
     /**
-     * Responsive sizing logic:
-     * - Base (2 people): 1.0 unit
-     * - Every extra 2 people adds 0.6 units of width (instead of 1.0).
-     * This makes larger tables look sleeker and more professional.
+     * Corrected Dimension Logic:
+     * - "Magnitude" (how big the table is) is driven by capacity.
+     * - "Orientation" (horizontal vs vertical) is driven by the DB width/height ratio.
+     * This keeps table size consistent while allowing rotation.
      */
     const cap = table.capacity ?? 2;
-    const floatW = 1 + (Math.max(0, cap - 2) / 2) * 0.6;
+    const baseDim = 1 + (Math.max(0, cap - 2) / 2) * 0.6;
     
-    // Width is capacity-driven; Height is standard 1.0 unit.
-    const safeW = floatW;
-    const safeH = 1;
+    const isVertical = (table.height ?? 1) > (table.width ?? 1);
+    const safeW = isVertical ? 1 : baseDim;
+    const safeH = isVertical ? baseDim : 1;
 
     const gridStyle: React.CSSProperties = {
         position: 'absolute',
@@ -79,7 +79,7 @@ export function TableCard({
         top: `calc(50% + ${-(table.position.y * cellSize) + panY}px)`,
         transform: `translate(-50%, -50%) rotate(${table.rotation ?? 0}deg)`,
         animationDelay: `${index * 40}ms`,
-        transition: isDraggingThis ? 'none' : 'left 0.15s ease, top 0.15s ease',
+        transition: isDraggingThis ? 'none' : 'left 0.15s ease, top 0.15s ease, width 0.2s ease, height 0.2s ease',
         zIndex: isDraggingThis ? 50 : 10,
         touchAction: 'none',
     };
@@ -95,10 +95,18 @@ export function TableCard({
         cursor: 'grabbing',
     } : gridStyle;
 
+    /** Clean label: remove trailing dot if present */
+    const rawLabel = table.displayName || table.name;
+    const cleanLabel = rawLabel.endsWith('.') ? rawLabel.slice(0, -1) : rawLabel;
+
+    /** 1x1 and Vertical tables: show max 4 chars to prevent UI break */
+    const isNarrow = safeW <= 1.2;
+    const displayLabel = isNarrow ? cleanLabel.slice(0, 4) : cleanLabel;
+
     return (
         <button
             data-table={table._id}
-            className={`flex flex-col items-center justify-center gap-0.5 p-2 rounded-xl border-2 shadow-sm transition-opacity duration-200 animate-[scaleIn_0.3s_ease-out_backwards] ${statusClass} ${isDraggingThis ? 'scale-105' : 'active:scale-95'} ${isAdmin ? 'cursor-grab' : ''}`}
+            className={`flex flex-col items-center justify-center ${isNarrow ? 'p-1' : 'p-2'} rounded-xl border-2 shadow-sm transition-opacity duration-200 animate-[scaleIn_0.3s_ease-out_backwards] ${statusClass} ${isDraggingThis ? 'scale-105' : 'active:scale-95'} ${isAdmin ? 'cursor-grab' : ''}`}
             style={draggingStyle}
             onClick={onClick}
             onPointerDown={(e) => {
@@ -107,23 +115,18 @@ export function TableCard({
                 }
             }}
             onPointerUp={onLongPressCancel}
-            title={table.displayName || table.name}
+            title={cleanLabel}
         >
             {/* Code badge — top right */}
             {table.code && (
-                <span className="absolute -top-2 -right-2 bg-stone-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none">
+                <span className="absolute -top-2 -right-2 bg-stone-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
                     {table.code}
                 </span>
             )}
 
-            <span className="text-xs font-bold truncate w-full text-center leading-tight">
-                {table.displayName || table.name}
+            <span className={`text-xs font-bold w-full text-center leading-none ${isNarrow ? 'overflow-hidden whitespace-nowrap' : 'truncate'}`}>
+                {displayLabel}
             </span>
-
-            {/* Status dot */}
-            <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${table.status === TableStatus.AVAILABLE ? 'bg-emerald-500' :
-                    table.status === TableStatus.OCCUPIED ? 'bg-amber-500' : 'bg-blue-500'
-                }`} />
         </button>
     );
 }

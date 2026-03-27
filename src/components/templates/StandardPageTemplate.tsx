@@ -11,14 +11,16 @@ interface StandardPageTemplateProps {
  */
 export function StandardPageTemplate({ header, children }: StandardPageTemplateProps) {
     return (
-        <div className="flex flex-col min-h-screen bg-stone-50/30">
-            <div className="sticky top-14 z-40 bg-white shadow-sm shadow-stone-100">
-                {header}
-            </div>
+        <div className="flex flex-col min-h-full">
+            {header && (
+                <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-stone-100 shadow-sm shadow-stone-100/50">
+                    {header}
+                </div>
+            )}
             
-            <main className="flex-1 p-4 pb-24 overflow-y-auto animate-fade-in">
+            <div className="flex-1 p-4 pb-24 animate-fade-in">
                 {children}
-            </main>
+            </div>
         </div>
     );
 }

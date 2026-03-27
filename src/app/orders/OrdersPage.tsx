@@ -37,15 +37,14 @@ export function OrdersPage() {
         );
     }
 
-    const header = (
-        <div className="px-4 py-3">
-            <h2 className="text-xl font-bold text-stone-900">Today's Orders</h2>
-        </div>
-    );
-
     return (
-        <StandardPageTemplate header={header}>
+        <StandardPageTemplate header={null}>
             <div className="flex flex-col gap-6">
+                <div className="flex flex-col gap-1 mb-2">
+                    <h2 className="text-2xl font-bold text-stone-900 tracking-tight">Orders</h2>
+                    <p className="text-sm text-stone-500">Real-time status of today's service</p>
+                </div>
+
                 {orders.length === 0 ? (
                     <div className="flex flex-col items-center gap-3 py-20 px-4 text-center">
                         <span className="text-5xl">📋</span>

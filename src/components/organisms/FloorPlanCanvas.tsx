@@ -1,9 +1,10 @@
-import { useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Users, Plus, Crosshair } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { TableCard } from '../molecules/TableCard';
 import { useTableDrag } from '../../hooks/useTableDrag';
 import { useAuthStore } from '../../stores/authStore';
+import { AlignmentPicker } from '../molecules/AlignmentPicker';
 import api from '../../services/api';
 import type { Table } from '../../types';
 
@@ -23,6 +24,7 @@ interface FloorPlanCanvasProps {
     onTableTap: (table: Table) => void;
     onAddTables: () => void;
     onTableMoved?: (tableId: string, x: number, y: number) => void;
+    onTableUpdate?: (tableId: string, updates: Partial<Table>) => void;
 }
 
 /**
@@ -33,7 +35,15 @@ interface FloorPlanCanvasProps {
  * re-renders during panning. Momentum/inertia on pointer-up via RAF.
  * This gives smooth 60fps feel identical to Google Maps.
  */
-export function FloorPlanCanvas({ tables, isAdmin, onTableTap, onAddTables, onTableMoved }: FloorPlanCanvasProps) {
+export function FloorPlanCanvas({ 
+    tables, 
+    isAdmin, 
+    onTableTap, 
+    onAddTables, 
+    onTableMoved, 
+    onTableUpdate 
+}: FloorPlanCanvasProps) {
+    const [rotationTarget, setRotationTarget] = useState<Table | null>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
     const sceneRef = useRef<HTMLDivElement>(null); // transform target for all tables
     const gridRef = useRef<HTMLDivElement>(null);  // grid overlay
@@ -84,10 +94,34 @@ export function FloorPlanCanvas({ tables, isAdmin, onTableTap, onAddTables, onTa
         }
     }, [onTableMoved]);
 
+    const handleRotate = useCallback((table: Table) => {
+        setRotationTarget(table);
+    }, []);
+
+    const performRotation = async (orientation: 'H' | 'V') => {
+        if (!rotationTarget) return;
+        const table = rotationTarget;
+        
+        // H = 2x1, V = 1x2 (in base schema units).
+        // TableCard uses these to determine orientation, magnitude is capacity-based.
+        const newWidth = orientation === 'H' ? 2 : 1;
+        const newHeight = orientation === 'H' ? 1 : 2;
+
+        onTableUpdate?.(table._id, { width: newWidth, height: newHeight });
+        setRotationTarget(null);
+
+        try {
+            await api.patch(`/tables/${table._id}`, { width: newWidth, height: newHeight });
+        } catch (err) {
+            console.error('Failed to save rotation:', err);
+        }
+    };
+
     const { dragging, onTableTouchStart, handleMove, cancelLongPress, onDragMove, onDragEnd, isDragging } = useTableDrag({
         canvasRef,
         panRef,
         onDropped: handleDropped,
+        onRotate: handleRotate,
     });
 
     /* ─── Pointer handlers (must after useTableDrag to use its returns) ─── */
@@ -281,6 +315,15 @@ export function FloorPlanCanvas({ tables, isAdmin, onTableTap, onAddTables, onTa
             >
                 <Crosshair size={12} /> Origin
             </button>
+
+            {/* Rotation Modal */}
+            {rotationTarget && (
+                <AlignmentPicker 
+                    tableName={rotationTarget.name}
+                    onClose={() => setRotationTarget(null)}
+                    onSelect={performRotation}
+                />
+            )}
         </div>
     );
 }
