@@ -115,9 +115,14 @@ export function useTableDrag({ canvasRef, panRef, onDropped }: UseTableDragOptio
         }
         cancelLongPress();
         if (!dragging) return;
+        
         const { x, y } = screenToGrid(screenX, screenY);
-        setDragging(null);
+        
+        // Call onDropped FIRST (optimistic update happens here)
+        // This ensures the parent state reflects the new pos before setDragging(null)
         await onDropped(dragging.table._id, x, y);
+        
+        setDragging(null);
     }, [dragging, cancelLongPress, screenToGrid, onDropped, canvasRef]);
 
     return {

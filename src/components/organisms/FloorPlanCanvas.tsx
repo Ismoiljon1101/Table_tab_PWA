@@ -74,10 +74,14 @@ export function FloorPlanCanvas({ tables, isAdmin, onTableTap, onAddTables, onTa
 
     /* ─── Table drag hook (needs pan for grid coordinate calc) ─── */
     const handleDropped = useCallback(async (tableId: string, gridX: number, gridY: number) => {
+        // Optimistic update: notify parent immediately to prevent "trip" back to old pos
+        onTableMoved?.(tableId, gridX, gridY);
         try {
             await api.patch(`/tables/${tableId}`, { position: { x: gridX, y: gridY } });
-            onTableMoved?.(tableId, gridX, gridY);
-        } catch (err) { console.error('Failed to save table position:', err); }
+        } catch (err) { 
+            console.error('Failed to save table position:', err);
+            // Optional: fetch tables again on error to revert to server state
+        }
     }, [onTableMoved]);
 
     const { dragging, onTableTouchStart, handleMove, cancelLongPress, onDragMove, onDragEnd, isDragging } = useTableDrag({
