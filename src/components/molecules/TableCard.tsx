@@ -58,12 +58,23 @@ export function TableCard({
     const statusClass = STATUS_CLASSES[table.status] ?? 'border-stone-200 bg-white text-stone-700';
 
     /**
-     * Normalize legacy width/height:
-     * - Old form used 100 (px intent) → treat any value > 6 as legacy → default to 2.
-     * - Valid grid units are 1–4. 1×2 = narrow tall, 2×1 = wide short.
+     * Normalize size:
+     * We follow a 1-unit-per-2-people rule:
+     * - 1-2 people -> 1x1
+     * - 3-4 people -> 2x1
+     * - 5-6 people -> 3x1
+     * - 7-8 people -> 4x1
+     * 
+     * If width/height already exist as valid grid units (and aren't the 2x1 default), 
+     * we respect them to allow manual overrides later.
      */
-    const safeW = (table.width ?? 2) > 6 ? 2 : Math.max(1, Math.min(table.width ?? 2, 4));
-    const safeH = (table.height ?? 1) > 6 ? 1 : Math.max(1, Math.min(table.height ?? 1, 4));
+    const cap = table.capacity ?? 4;
+    const defaultW = cap <= 2 ? 1 : cap <= 4 ? 2 : cap <= 6 ? 3 : 4;
+    const defaultH = 1;
+
+    // Treat any value > 6 as legacy (px intent) and replace with capacity-derived default
+    const safeW = (table.width ?? 2) > 6 ? defaultW : (table.width ?? defaultW);
+    const safeH = (table.height ?? 1) > 6 ? defaultH : (table.height ?? defaultH);
 
     const gridStyle: React.CSSProperties = {
         position: 'absolute',

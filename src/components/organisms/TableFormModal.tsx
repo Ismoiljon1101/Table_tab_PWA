@@ -32,14 +32,21 @@ export function TableFormModal({ table, sections, onClose, onSuccess }: TableFor
         setLoading(true);
         setError(null);
 
+        const cap = parseInt(capacity, 10);
+        // 1-2 -> 1x1, 3-4 -> 2x1, 5-6 -> 3x1
+        const w = cap <= 2 ? 1 : cap <= 4 ? 2 : cap <= 6 ? 3 : 4;
+        const h = 1;
+
         const payload = {
             name,
             displayName: displayName || name,
             code: code.trim() || undefined,
-            capacity: parseInt(capacity, 10),
+            capacity: cap,
             section: sectionId || null,
-            // width/height = grid units. 1 unit = 44px. 2×1 = standard table (88×44px). 1×2 = narrow tall.
-            ...(isEdit ? {} : { position: { x: 0, y: 0 }, rotation: 0, width: 2, height: 1, shape: 'rectangle' })
+            width: w,
+            height: h,
+            // Only set position/shape for new tables
+            ...(isEdit ? {} : { position: { x: 0, y: 0 }, shape: 'rectangle', rotation: 0 })
         };
 
         try {
