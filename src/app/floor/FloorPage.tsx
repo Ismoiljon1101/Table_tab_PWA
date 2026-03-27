@@ -1,48 +1,104 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Users } from 'lucide-react';
-import { Badge } from '../../components/atoms/Badge';
-import { Button } from '../../components/atoms/Button';
+import { SectionTabs } from '../../components/organisms/SectionTabs';
+import { FloorTemplate } from '../../components/templates/FloorTemplate';
+import { FloorPlanCanvas } from '../../components/organisms/FloorPlanCanvas';
+import { TableActionSheet } from '../../components/organisms/TableActionSheet';
 import { useAuthStore } from '../../stores/authStore';
 import { useCartStore } from '../../stores/cartStore';
-import { UserRole, TableStatus } from '../../types/enums';
-import type { Table } from '../../types';
+import { UserRole } from '../../types/enums';
 import api from '../../services/api';
+import { mongoIdsMatch } from '../../libs/mongoId';
+import type { Table, Section } from '../../types';
 
 /**
- * Floor plan page — the primary view for waiters.
- * Shows draggable table cards with status colors.
- * Tap = select table for new order or show action sheet on occupied.
+ * FloorPage
+ * Refactored to use Atomic Design (Templates, Organisms, Molecules).
  */
 export function FloorPage() {
     const [tables, setTables] = useState<Table[]>([]);
+    const [sections, setSections] = useState<Section[]>([]);
+    const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [actionTable, setActionTable] = useState<Table | null>(null);
+    const [apiError, setApiError] = useState<string | null>(null);
+    const [apiLogs, setApiLogs] = useState<{ time: string, msg: string }[]>([]);
+
     const user = useAuthStore((s) => s.user);
+    const setCurrentFloorName = useAuthStore((s) => s.setCurrentFloorName);
     const setTable = useCartStore((s) => s.setTable);
     const clearCart = useCartStore((s) => s.clearCart);
     const navigate = useNavigate();
 
     const isAdmin = user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN;
 
+    const addLog = (msg: string) => {
+        const time = new Date().toLocaleTimeString();
+        setApiLogs(prev => [{ time, msg }, ...prev].slice(0, 5));
+    };
+
     useEffect(() => {
-        fetchTables();
+        const init = async () => {
+            setLoading(true);
+            setApiError(null);
+            addLog('Initializing floor plan...');
+            try {
+                await Promise.all([fetchTables(), fetchSections()]);
+                addLog('Initialization complete');
+            } catch (err: any) {
+                console.error('Critical Floor Init Error:', err);
+                setApiError(`Init Error: ${err.message || 'Unknown crash'}`);
+                addLog(`CRASH: ${err.message}`);
+            } finally {
+                setLoading(false);
+            }
+        };
+        init();
     }, []);
 
     const fetchTables = async () => {
         try {
-            const { data } = await api.get<Table[]>('/tables');
-            setTables(data);
-        } catch (err) {
+            const res = await api.get<Table[]>('/tables');
+            setTables(res.data);
+            addLog(`Fetched ${res.data.length} tables`);
+        } catch (err: unknown) {
+            const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Unknown error';
+            const status = (err as any)?.response?.status;
+            setApiError(`Tables API failed: ${status ? `[${status}]` : ''} ${msg}`);
+            addLog(`Tables API Error: ${status || 'ERR'}`);
             console.error('Failed to fetch tables:', err);
-        } finally {
-            setLoading(false);
         }
     };
 
-    /** Handle table tap */
+    const fetchSections = async () => {
+        try {
+            const res = await api.get<Section[]>('/sections');
+            const secs = res.data;
+            setSections(secs);
+            // Auto-select the first section right away — avoids race with useEffect
+            if (secs.length > 0) {
+                setSelectedSectionId(secs[0]._id);
+                setCurrentFloorName(secs[0].name);
+            } else {
+                setCurrentFloorName('Floor Plan');
+            }
+        } catch (err) {
+            const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Unknown error';
+            const status = (err as any)?.response?.status;
+            setApiError(prev => `${prev ?? ''}\nSections API failed: ${status ? `[${status}]` : ''} ${msg}`);
+            console.error('Failed to fetch sections:', err);
+        }
+    };
+
+
+    const handleSelectSection = (id: string | null) => {
+        setSelectedSectionId(id);
+        const section = sections.find(s => s._id === id);
+        setCurrentFloorName(section ? section.name : 'Floor Plan');
+    };
+
     const handleTableTap = (table: Table) => {
-        if (table.status === TableStatus.OCCUPIED) {
+        if (table.status === 'occupied') {
             setActionTable(table);
         } else {
             clearCart();
@@ -51,7 +107,6 @@ export function FloorPage() {
         }
     };
 
-    /** Action sheet handlers */
     const handleAddMenu = () => {
         if (!actionTable) return;
         setTable(actionTable._id);
@@ -61,7 +116,6 @@ export function FloorPage() {
 
     const handleNewCustomer = async () => {
         if (!actionTable) return;
-        // Mark current order as served, then start fresh
         if (actionTable.currentOrderId) {
             try {
                 await api.put(`/orders/${actionTable.currentOrderId}/status`, { status: 'served' });
@@ -77,7 +131,6 @@ export function FloorPage() {
 
     const handleCancelOrder = async () => {
         if (!actionTable?.currentOrderId) return;
-        // Note: BE doesn't have cancel endpoint yet, we set to served
         try {
             await api.put(`/orders/${actionTable.currentOrderId}/status`, { status: 'served' });
             await fetchTables();
@@ -87,105 +140,117 @@ export function FloorPage() {
         setActionTable(null);
     };
 
-    /** Get status color class */
-    const getStatusClass = (status: TableStatus): string => {
-        switch (status) {
-            case TableStatus.AVAILABLE: return 'border-emerald-200 bg-gradient-to-b from-emerald-50 to-white';
-            case TableStatus.OCCUPIED: return 'border-amber-200 bg-gradient-to-b from-amber-50 to-white';
-            case TableStatus.RESERVED: return 'border-blue-200 bg-gradient-to-b from-blue-50 to-white';
-            default: return 'border-stone-200 bg-white';
-        }
+    /**
+     * Filter tables by the selected section.
+     * Uses mongoIdsMatch to safely compare regardless of ObjectId serialization.
+     */
+    const displayedTables = selectedSectionId
+        ? tables.filter(t => mongoIdsMatch(t.section, selectedSectionId))
+        : tables;
+
+    /** Optimistically update a table's position in local state after drag-drop */
+    const handleTableMoved = (tableId: string, x: number, y: number) => {
+        setTables(prev => prev.map(t =>
+            t._id === tableId ? { ...t, position: { x, y } } : t
+        ));
     };
 
-    if (loading) {
+    console.log('[FloorPage] RENDER - Tables:', tables.length, 'Sections:', sections.length);
+
+    try {
+        if (loading && tables.length === 0 && sections.length === 0) {
+            return (
+                <div className="flex flex-col items-center justify-center min-h-[400px] gap-3 text-stone-400">
+                    <div className="w-8 h-8 rounded-full border-4 border-stone-200 border-t-amber-600 animate-spin" />
+                    <p>Loading floor plan...</p>
+                </div>
+            );
+        }
+
+        if (apiError) {
+            return (
+                <div className="flex flex-col items-start gap-3 m-4 p-5 bg-red-50 border border-red-200 rounded-3xl text-sm shadow-sm">
+                    <div className="flex items-center gap-2 text-red-700 font-bold">
+                        <span>⚠️ Floor Data Failure</span>
+                    </div>
+                    <div className="w-full bg-white/50 p-3 rounded-xl border border-red-100 font-mono text-[11px] text-red-600 overflow-auto max-h-[200px]">
+                        {apiError}
+                    </div>
+                    <button
+                        className="w-full py-3 bg-red-600 text-white font-semibold rounded-2xl"
+                        onClick={() => { setApiError(null); window.location.reload(); }}
+                    >
+                        Retry Connection
+                    </button>
+                </div>
+            );
+        }
+
+        const header = (
+            <div className="flex flex-col bg-white">
+                <SectionTabs 
+                    sections={sections} 
+                    selectedSectionId={selectedSectionId} 
+                    onSelectSection={handleSelectSection} 
+                />
+                <div className="px-4 py-2 border-t border-stone-100 flex justify-between items-center">
+                    <span className="text-[9px] text-stone-400">Status: {tables.length} tables found</span>
+                    <button 
+                        onClick={() => { localStorage.removeItem(`floor_pan_${user?.restaurantId}`); window.location.reload(); }}
+                        className="text-[10px] uppercase tracking-widest font-bold text-stone-400"
+                    >
+                        Reset View
+                    </button>
+                </div>
+            </div>
+        );
+
         return (
-            <div className="flex flex-col items-center justify-center min-h-[300px] gap-3 text-stone-400">
-                <div className="w-8 h-8 rounded-full border-4 border-stone-200 border-t-amber-600 animate-spin" />
-                <p>Loading floor plan...</p>
+            <FloorTemplate
+                header={header}
+                actionSheet={actionTable && (
+                    <TableActionSheet
+                        table={actionTable}
+                        onClose={() => setActionTable(null)}
+                        onAddMenu={handleAddMenu}
+                        onNewCustomer={handleNewCustomer}
+                        onCancelOrder={handleCancelOrder}
+                    />
+                )}
+            >
+                {displayedTables.length === 0 && !loading ? (
+                    <div className="flex flex-col items-center justify-center p-12 text-center text-stone-400 gap-4">
+                        <div className="w-16 h-16 bg-stone-50 rounded-full flex items-center justify-center text-2xl opacity-50">🍽️</div>
+                        <p className="font-semibold text-stone-600">No Tables in this Section</p>
+                    </div>
+                ) : (
+                    <FloorPlanCanvas
+                        tables={displayedTables}
+                        isAdmin={isAdmin}
+                        onTableTap={handleTableTap}
+                        onAddTables={() => navigate('/settings')}
+                        onTableMoved={handleTableMoved}
+                    />
+                )}
+
+                {/* Debug Overlay */}
+                <div className="fixed bottom-20 left-4 right-4 z-[100] pointer-events-none flex flex-col items-start gap-1">
+                    {apiLogs.map((log, i) => (
+                        <div key={i} className="bg-black/80 text-white text-[9px] px-2 py-1 rounded">
+                            {log.time} - {log.msg}
+                        </div>
+                    ))}
+                </div>
+            </FloorTemplate>
+        );
+    } catch (renderErr: any) {
+        console.error('CRITICAL RENDER ERROR:', renderErr);
+        return (
+            <div className="p-10 text-red-600 bg-red-50 rounded-3xl m-4 border-2 border-red-200">
+                <h2 className="font-bold mb-2">Internal Render Crash</h2>
+                <pre className="text-[10px] whitespace-pre-wrap">{renderErr.message}</pre>
+                <pre className="text-[10px] opacity-50 mt-4">{renderErr.stack}</pre>
             </div>
         );
     }
-
-    return (
-        <div className="p-4">
-            {/* Stats bar */}
-            <div className="flex bg-white gap-4 p-3 rounded-xl shadow-sm mb-4 border border-stone-100">
-                <div className="flex items-center gap-2 text-sm text-stone-600 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                    <span>{tables.filter((t) => t.status === TableStatus.AVAILABLE).length} Free</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-stone-600 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-amber-600" />
-                    <span>{tables.filter((t) => t.status === TableStatus.OCCUPIED).length} Occupied</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-stone-600 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-blue-600" />
-                    <span>{tables.filter((t) => t.status === TableStatus.RESERVED).length} Reserved</span>
-                </div>
-            </div>
-
-            {/* Table Grid */}
-            {tables.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 py-16 px-4 text-center">
-                    <Users size={48} className="text-stone-400" />
-                    <h3 className="text-lg font-semibold text-stone-900">No tables yet</h3>
-                    <p className="text-stone-500 mb-2">Add tables to get started</p>
-                    {isAdmin && (
-                        <Button variant="primary" onClick={() => navigate('/settings')}>
-                            <Plus size={18} className="mr-2" /> Add Tables
-                        </Button>
-                    )}
-                </div>
-            ) : (
-                <div className="grid grid-cols-2 gap-3">
-                    {tables.map((table, idx) => (
-                        <button
-                            key={table._id}
-                            className={`flex flex-col items-center gap-2 p-5 rounded-2xl border-2 shadow-sm transition-all duration-200 active:scale-95 animate-[scaleIn_0.3s_ease-out_backwards] ${getStatusClass(table.status)}`}
-                            style={{ animationDelay: `${idx * 40}ms` }}
-                            onClick={() => handleTableTap(table)}
-                        >
-                            <span className="text-xl font-bold text-stone-900">{table.displayName || table.name}</span>
-                            <Badge label={table.status} variant={table.status} />
-                            <span className="flex items-center gap-1.5 text-xs text-stone-500 mt-1">
-                                <Users size={12} /> {table.capacity}
-                            </span>
-                        </button>
-                    ))}
-                </div>
-            )}
-
-            {/* Action Sheet for occupied table */}
-            {actionTable && (
-                <div className="fixed inset-0 bg-black/40 z-[200] flex items-end justify-center animate-fade-in" onClick={() => setActionTable(null)}>
-                    <div className="w-full max-w-[480px] bg-white rounded-t-3xl p-5 pb-[calc(24px+env(safe-area-inset-bottom))] animate-slide-up" onClick={(e) => e.stopPropagation()}>
-                        <div className="w-9 h-1 rounded-full bg-stone-300 mx-auto mb-5" />
-                        <h3 className="text-xl font-bold text-center mb-1 text-stone-900">
-                            {actionTable.displayName || actionTable.name}
-                        </h3>
-                        <p className="text-sm text-stone-500 text-center mb-6">This table has an active order</p>
-
-                        <div className="flex flex-col gap-2">
-                            <button className="flex items-center gap-3 w-full p-4 rounded-xl bg-amber-50 text-amber-700 font-semibold transition-all duration-200 active:scale-95 active:bg-amber-100" onClick={handleAddMenu}>
-                                <span className="text-xl">📋</span>
-                                <span>Add Menu Items</span>
-                            </button>
-                            <button className="flex items-center gap-3 w-full p-4 rounded-xl bg-stone-50 border border-stone-100 text-stone-800 font-medium transition-all duration-200 active:scale-95 active:bg-stone-100" onClick={handleNewCustomer}>
-                                <span className="text-xl">👋</span>
-                                <span>New Customer</span>
-                            </button>
-                            <button className="flex items-center gap-3 w-full p-4 rounded-xl bg-stone-50 border border-stone-100 text-red-600 font-medium transition-all duration-200 active:scale-95 active:bg-red-50" onClick={handleCancelOrder}>
-                                <span className="text-xl">❌</span>
-                                <span>Cancel Order</span>
-                            </button>
-                        </div>
-
-                        <button className="w-full mt-4 p-3 text-stone-500 font-medium rounded-xl active:bg-stone-50 transition-colors" onClick={() => setActionTable(null)}>
-                            Close
-                        </button>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
 }

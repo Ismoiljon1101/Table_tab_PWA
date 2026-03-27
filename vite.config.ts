@@ -59,6 +59,20 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       port: port,
+      strictPort: true, // Never fall back to another port — fail loudly if 5100 is in use
+      /**
+       * Vite dev proxy: all /v1/* requests are forwarded to the NestJS backend.
+       * This COMPLETELY eliminates CORS issues in development — the browser
+       * only ever talks to localhost:5100, and Vite proxies internally.
+       * Set VITE_BACKEND_URL in .env to change the target (default: 3500).
+       */
+      proxy: {
+        '/v1': {
+          target: env.VITE_BACKEND_URL || 'http://localhost:3500',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
   };
 })

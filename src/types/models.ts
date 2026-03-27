@@ -47,13 +47,17 @@ export interface Table {
     _id: string;
     name: string;
     displayName: string;
+    /** Short display code e.g. 'T1', 'VIP-2' */
+    code?: string;
     restaurantId: string;
     capacity: number;
     status: TableStatus;
     position: TablePosition;
     rotation: number;
     section: string | null;
+    /** Width in grid units (1 = CELL_SIZE_PX pixels) */
     width: number;
+    /** Height in grid units (1 = CELL_SIZE_PX pixels) */
     height: number;
     shape: string;
     currentOrderId?: string;
@@ -65,6 +69,8 @@ export interface Table {
 export interface Section {
     _id: string;
     name: string;
+    /** Short display code e.g. 'H1', 'SEC-A' */
+    code?: string;
     restaurantId: string;
 }
 
@@ -72,6 +78,7 @@ export interface Section {
 export interface Category {
     _id: string;
     name: string;
+    code?: string;
     restaurantId: string;
 }
 
@@ -90,6 +97,7 @@ export interface MenuItem {
     _id: string;
     restaurantId: string;
     name: string;
+    code?: string;
     price: number;
     category: Category | string;
     isAvailable: boolean;

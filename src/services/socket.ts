@@ -9,7 +9,7 @@ let socket: Socket | null = null;
 export function connectSocket(): Socket {
     if (socket?.connected) return socket;
 
-    const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3000';
+    const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3500';
 
     socket = io(wsUrl, {
         transports: ['websocket', 'polling'],
