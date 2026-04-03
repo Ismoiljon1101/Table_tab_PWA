@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppShell } from './components/templates/AppShell';
 import { LoginPage } from './app/login/LoginPage';
@@ -32,6 +33,16 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
  * Root application component with routing.
  */
 export default function App() {
+  const { user, refreshSession } = useAuthStore();
+
+  useEffect(() => {
+    if (user) {
+      console.log('🔄 Initial mount: Silently refreshing 7-day session');
+      refreshSession();
+    }
+    // Only run once on mount to avoid interrupting fresh logins
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>

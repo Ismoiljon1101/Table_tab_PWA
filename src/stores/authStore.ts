@@ -24,6 +24,8 @@ interface AuthState {
     registerWaiter: (email: string, password: string, nickname: string, restaurantId: string) => Promise<void>;
     /** Logout and clear state */
     logout: () => void;
+    /** Refresh current session to extend validity (sliding window) */
+    refreshSession: () => Promise<void>;
     /** Clear error message */
     clearError: () => void;
     /** Set current floor name */
@@ -106,6 +108,23 @@ export const useAuthStore = create<AuthState>()(
                 clearTokens();
                 disconnectSocket();
                 set({ user: null, restaurant: null, error: null });
+            },
+
+            refreshSession: async () => {
+                try {
+                    const { data } = await api.post('/auth/refresh');
+                    setTokens(data.accessToken, data.refreshToken);
+                    set({ user: data.user, restaurant: data.restaurant });
+
+                    const sock = connectSocket();
+                    if (!sock.connected) {
+                        sock.on('connect', () => joinRestaurant(data.restaurant._id));
+                    } else {
+                        joinRestaurant(data.restaurant._id);
+                    }
+                } catch (err) {
+                    console.warn('Session refresh failed, user may need to re-login eventually');
+                }
             },
 
             clearError: () => set({ error: null }),
