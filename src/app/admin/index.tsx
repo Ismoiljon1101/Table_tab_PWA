@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, LayoutGrid, Tag, UtensilsCrossed, Layout, Plus } from 'lucide-react';
 import { TableManagement } from '../../components/organisms/TableManagement';
 import { SectionManagement } from '../../components/organisms/SectionManagement';
@@ -20,7 +20,8 @@ type AdminTab = 'tables' | 'sections' | 'categories' | 'items';
  * Refactored to use Atomic Design (Templates, Organisms).
  */
 export function AdminPage() {
-    const [activeTab, setActiveTab] = useState<AdminTab>('tables');
+    const location = useLocation();
+    const [activeTab, setActiveTab] = useState<AdminTab>((location.state?.activeTab as AdminTab) || 'tables');
     const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
     
@@ -33,6 +34,12 @@ export function AdminPage() {
     const itemRef = useRef<{ handleAdd: () => void }>(null);
 
     const isAdmin = user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN;
+
+    useEffect(() => {
+        if (location.state?.activeTab) {
+            setActiveTab(location.state.activeTab as AdminTab);
+        }
+    }, [location.state]);
 
     useEffect(() => {
         if (isAdmin) {

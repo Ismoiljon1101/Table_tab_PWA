@@ -1,5 +1,9 @@
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, ClipboardList, Settings, Bell } from 'lucide-react';
+import { LayoutGrid, UtensilsCrossed, ShoppingCart, ClipboardList, Settings, Bell } from 'lucide-react';
+import { CartBottomSheet } from '../organisms/CartBottomSheet';
+import api from '../../services/api';
+import type { Table } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { useCartStore } from '../../stores/cartStore';
 
@@ -13,6 +17,17 @@ export function AppShell() {
     const cartCount = useCartStore((s) => s.totalItems());
     const location = useLocation();
     const navigate = useNavigate();
+
+    const [isCartOpen, setIsCartOpen] = useState(false);
+    const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+
+    const cart = useCartStore();
+
+    useEffect(() => {
+        const handleOpenCart = () => setIsCartOpen(true);
+        window.addEventListener('open-cart', handleOpenCart);
+        return () => window.removeEventListener('open-cart', handleOpenCart);
+    }, []);
 
     const currentFloorName = useAuthStore((s) => s.currentFloorName);
     const isFloorPage = location.pathname === '/';
@@ -29,6 +44,31 @@ export function AppShell() {
     const isManagementPage = location.pathname.startsWith('/admin/manage');
     const isNotificationsPage = location.pathname === '/notifications';
 
+    const handlePlaceOrder = async () => {
+        if (cart.items.length === 0) return;
+        setIsPlacingOrder(true);
+        try {
+            const tableId = typeof cart.tableId === 'string' ? cart.tableId : (cart.tableId as unknown as Table)?._id;
+            await api.post('/orders', {
+                tableId,
+                items: cart.items.map(item => ({
+                    menuItemId: item.menuItemId,
+                    quantity: item.quantity,
+                    modifiers: item.modifiers,
+                    notes: item.notes
+                }))
+            });
+            cart.clearCart();
+            setIsCartOpen(false);
+            window.location.href = '/'; // Go back to floor
+        } catch (err) {
+            console.error('Failed to place order:', err);
+            alert('Failed to place order. Please try again.');
+        } finally {
+            setIsPlacingOrder(false);
+        }
+    };
+
     return (
         <div className="flex flex-col h-[100dvh] max-w-[480px] mx-auto bg-orange-50 relative overflow-hidden">
             {/* Header - Fixed 8% of Viewport Height (Hidden on Management) */}
@@ -38,14 +78,13 @@ export function AppShell() {
                         {getTitle()}
                     </h1>
 
-                    {cartCount > 0 && (
-                        <NavLink
-                            to="/menu"
-                            className="flex items-center justify-center min-w-[24px] h-[24px] px-1.5 rounded-full bg-amber-600 text-white text-xs font-bold animate-fade-in"
-                        >
-                            {cartCount}
-                        </NavLink>
-                    )}
+                    <button
+                        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all group ${location.pathname === '/orders' ? 'bg-amber-50 text-amber-600' : 'bg-stone-50 text-stone-400 active:bg-stone-100'}`}
+                        title="Orders"
+                        onClick={() => navigate('/orders')}
+                    >
+                        <ClipboardList size={20} strokeWidth={2.5} />
+                    </button>
 
                     <button
                         className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-stone-50 text-stone-400 active:bg-stone-100 active:text-amber-600 transition-all group"
@@ -75,12 +114,28 @@ export function AppShell() {
                 </NavLink>
 
                 <NavLink
-                    to="/orders"
+                    to="/admin/manage"
+                    state={{ activeTab: 'items' }}
                     className={({ isActive }) => `flex flex-col items-center gap-0.5 px-4 py-1 text-[11px] font-medium transition-colors duration-150 active:scale-95 ${isActive ? 'text-amber-600' : 'text-stone-400'}`}
                 >
-                    <ClipboardList size={22} />
-                    <span>Orders</span>
+                    <UtensilsCrossed size={22} />
+                    <span>Menu</span>
                 </NavLink>
+
+                <button
+                    onClick={() => setIsCartOpen(true)}
+                    className={`relative flex flex-col items-center gap-0.5 px-4 py-1 text-[11px] font-medium transition-colors duration-150 active:scale-95 ${isCartOpen ? 'text-amber-600' : 'text-stone-400'}`}
+                >
+                    <div className="relative">
+                        <ShoppingCart size={22} />
+                        {cartCount > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-amber-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center border border-white">
+                                {cartCount}
+                            </span>
+                        )}
+                    </div>
+                    <span>Cart</span>
+                </button>
 
                 <NavLink
                     to="/settings"
@@ -90,6 +145,14 @@ export function AppShell() {
                     <span>Settings</span>
                 </NavLink>
             </nav>
+
+            {isCartOpen && (
+                <CartBottomSheet
+                    onClose={() => setIsCartOpen(false)}
+                    onPlaceOrder={handlePlaceOrder}
+                    isPlacingOrder={isPlacingOrder}
+                />
+            )}
         </div>
     );
 }
