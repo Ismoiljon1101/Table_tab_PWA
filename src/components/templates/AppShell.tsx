@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutGrid, UtensilsCrossed, ShoppingCart, ClipboardList, Settings, Bell } from 'lucide-react';
+import { LayoutGrid, UtensilsCrossed, ShoppingCart, ClipboardList, Settings, Bell, Search, X } from 'lucide-react';
 import { CartBottomSheet } from '../organisms/CartBottomSheet';
 import api from '../../services/api';
 import type { Table } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { useCartStore } from '../../stores/cartStore';
+import { useSearchStore } from '../../stores/searchStore';
+import { shapeIntoMongoId } from '../../libs/mongoId';
 
 /**
  * Main app layout with sticky header and bottom navigation.
@@ -15,6 +17,7 @@ export function AppShell() {
     const user = useAuthStore((s) => s.user);
     const restaurant = useAuthStore((s) => s.restaurant);
     const cartCount = useCartStore((s) => s.totalItems());
+    const search = useSearchStore();
     const location = useLocation();
     const navigate = useNavigate();
 
@@ -28,6 +31,13 @@ export function AppShell() {
         window.addEventListener('open-cart', handleOpenCart);
         return () => window.removeEventListener('open-cart', handleOpenCart);
     }, []);
+
+    // Close search when navigating away from menu
+    useEffect(() => {
+        if (!location.pathname.startsWith('/menu')) {
+            search.closeSearch();
+        }
+    }, [location.pathname]);
 
     const currentFloorName = useAuthStore((s) => s.currentFloorName);
     const isFloorPage = location.pathname === '/';
@@ -48,22 +58,35 @@ export function AppShell() {
         if (cart.items.length === 0) return;
         setIsPlacingOrder(true);
         try {
-            const tableId = typeof cart.tableId === 'string' ? cart.tableId : (cart.tableId as unknown as Table)?._id;
-            await api.post('/orders', {
-                tableId,
-                items: cart.items.map(item => ({
-                    menuItemId: item.menuItemId,
+            const cleanTableId = shapeIntoMongoId(cart.tableId);
+            if (!cleanTableId) throw new Error('No table selected');
+
+            const payload = {
+                tableId: cleanTableId,
+                items: cart.items.map((item: any) => ({
+                    menuItemId: shapeIntoMongoId(item.menuItemId),
+                    name: item.name,
                     quantity: item.quantity,
-                    modifiers: item.modifiers,
-                    notes: item.notes
+                    unitPrice: item.unitPrice,
+                    modifiers: item.modifiers || [],
+                    notes: item.notes || ''
                 }))
-            });
+            };
+
+            if (cart.editingOrderId) {
+                // UPDATE Existing Order
+                await api.put(`/orders/${cart.editingOrderId}`, { items: payload.items });
+            } else {
+                // CREATE New Order
+                await api.post('/orders', payload);
+            }
+
             cart.clearCart();
             setIsCartOpen(false);
             window.location.href = '/'; // Go back to floor
         } catch (err) {
-            console.error('Failed to place order:', err);
-            alert('Failed to place order. Please try again.');
+            console.error('Failed to save order:', err);
+            alert('Failed to save order. Please check console.');
         } finally {
             setIsPlacingOrder(false);
         }
@@ -73,18 +96,49 @@ export function AppShell() {
         <div className="flex flex-col h-[100dvh] max-w-[480px] mx-auto bg-orange-50 relative overflow-hidden">
             {/* Header - Fixed 8% of Viewport Height (Hidden on Management) */}
             {!isManagementPage && !isNotificationsPage && (
-                <header className="h-[8vh] flex items-center px-4 bg-white/80 backdrop-blur-md border-b border-stone-100 gap-3 z-50">
-                    <h1 className="flex-1 text-lg font-bold text-stone-900 truncate">
-                        {getTitle()}
-                    </h1>
+                <header className="h-14 flex items-center px-4 bg-white/80 backdrop-blur-md border-b border-stone-100 gap-1.5 z-50 transition-all duration-300">
+                    {search.isSearchVisible ? (
+                        <div className="flex-1 flex items-center bg-stone-50 rounded-xl px-3 animate-fade-in group focus-within:bg-white focus-within:ring-1 focus-within:ring-amber-200 transition-all">
+                            <Search size={16} className="text-stone-400 group-focus-within:text-amber-600 transition-colors" />
+                            <input
+                                autoFocus
+                                type="text"
+                                value={search.query}
+                                onChange={(e) => search.setQuery(e.target.value)}
+                                placeholder="Search dishes..."
+                                className="w-full h-8 bg-transparent border-none text-sm focus:outline-none px-2 text-stone-900"
+                            />
+                            <button 
+                                onClick={search.toggleSearch}
+                                className="text-stone-300 hover:text-stone-600 active:scale-90 transition-all"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                    ) : (
+                        <>
+                            <h1 className="flex-1 text-lg font-bold text-stone-900 truncate animate-fade-in">
+                                {getTitle()}
+                            </h1>
 
-                    <button
-                        className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all group ${location.pathname === '/orders' ? 'bg-amber-50 text-amber-600' : 'bg-stone-50 text-stone-400 active:bg-stone-100'}`}
-                        title="Orders"
-                        onClick={() => navigate('/orders')}
-                    >
-                        <ClipboardList size={20} strokeWidth={2.5} />
-                    </button>
+                            {location.pathname.startsWith('/menu') && (
+                                <button
+                                    className="w-9 h-9 flex items-center justify-center rounded-xl bg-stone-50 text-stone-400 active:bg-amber-50 active:text-amber-600 transition-all"
+                                    onClick={search.toggleSearch}
+                                >
+                                    <Search size={20} strokeWidth={2.5} />
+                                </button>
+                            )}
+
+                            <button
+                                className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all group ${location.pathname === '/orders' ? 'bg-amber-50 text-amber-600' : 'bg-stone-50 text-stone-400 active:bg-stone-100'}`}
+                                title="Orders"
+                                onClick={() => navigate('/orders')}
+                            >
+                                <ClipboardList size={20} strokeWidth={2.5} />
+                            </button>
+                        </>
+                    )}
 
                     <button
                         className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-stone-50 text-stone-400 active:bg-stone-100 active:text-amber-600 transition-all group"

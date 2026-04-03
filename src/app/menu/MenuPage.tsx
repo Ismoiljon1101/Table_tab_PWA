@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useSearchStore } from '../../stores/searchStore';
 import { Search, ShoppingCart } from 'lucide-react';
 import { MenuTemplate } from '../../components/templates/MenuTemplate';
 import { MenuCategoryTabs } from '../../components/organisms/MenuCategoryTabs';
@@ -7,23 +8,23 @@ import { ModifierModal } from '../../components/organisms/ModifierModal';
 import { CartBottomSheet } from '../../components/organisms/CartBottomSheet';
 import { useCartStore } from '../../stores/cartStore';
 import api from '../../services/api';
-import type { MenuItem, Category, Table } from '../../types';
+import type { MenuItem, Category } from '../../types';
 
 /**
  * MenuPage
  * Refactored to use Atomic Design (Templates, Organisms, Molecules).
  */
 export function MenuPage() {
+    // --- STATE MANAGEMENT ---
     const [items, setItems] = useState<MenuItem[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [selectedCategoryId, setSelectedCategoryId] = useState('all');
-    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategoryId, setSelectedCategoryId] = useState('');
     const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
-    const [isCartOpen, setIsCartOpen] = useState(false);
-    const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
-    const cart = useCartStore();
+    // --- SHARED STORES ---
+    const cart = useCartStore(); // Handles global order state
+    const search = useSearchStore(); // Consumes search query from the top header (AppShell)
 
     useEffect(() => {
         fetchData();
@@ -38,6 +39,11 @@ export function MenuPage() {
             ]);
             setItems(itemRes.data);
             setCategories(catRes.data);
+            
+            // Auto-select the first category by default
+            if (catRes.data.length > 0 && !selectedCategoryId) {
+                setSelectedCategoryId(catRes.data[0]._id);
+            }
         } catch (err) {
             console.error('Failed to fetch menu data:', err);
         } finally {
@@ -45,44 +51,32 @@ export function MenuPage() {
         }
     };
 
-    const handlePlaceOrder = async () => {
-        if (cart.items.length === 0) return;
-        setIsPlacingOrder(true);
-        try {
-            const tableId = typeof cart.tableId === 'string' ? cart.tableId : (cart.tableId as unknown as Table)?._id;
-            await api.post('/orders', {
-                tableId,
-                items: cart.items.map(item => ({
-                    menuItemId: item.menuItemId,
-                    quantity: item.quantity,
-                    modifiers: item.modifiers,
-                    notes: item.notes
-                }))
-            });
-            cart.clearCart();
-            setIsCartOpen(false);
-            window.location.href = '/floor';
-        } catch (err) {
-            console.error('Failed to place order:', err);
-            alert('Failed to place order. Please try again.');
-        } finally {
-            setIsPlacingOrder(false);
-        }
+    const handleOpenCart = () => {
+        window.dispatchEvent(new CustomEvent('open-cart'));
     };
 
+    /**
+     * Computes the final list of items based on Category selection and Global Search (from App Bar).
+     * This is memoized to prevent re-filtering on every re-render.
+     */
     const filteredItems = useMemo(() => {
         let result = items;
-        if (selectedCategoryId !== 'all') {
-            result = result.filter(i => {
+
+        // 1. Filter by category (Defaulting to the selected one)
+        if (selectedCategoryId) {
+            result = result.filter((i: MenuItem) => {
                 const catId = typeof i.category === 'string' ? i.category : i.category?._id;
                 return catId === selectedCategoryId;
             });
         }
-        if (searchQuery) {
-            result = result.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+        // 2. Filter by search query (shared from top AppShell)
+        if (search.query) {
+            result = result.filter((i: MenuItem) => i.name.toLowerCase().includes(search.query.toLowerCase()));
         }
+        
         return result;
-    }, [items, selectedCategoryId, searchQuery]);
+    }, [items, selectedCategoryId, search.query]);
 
     if (loading && items.length === 0) {
         return (
@@ -93,22 +87,10 @@ export function MenuPage() {
         );
     }
 
-    const header = (
-        <div className="px-4 py-3 flex flex-col gap-3">
-            <h2 className="text-xl font-bold text-stone-900">Ordering Menu</h2>
-            <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
-                <input
-                    type="text"
-                    placeholder="Search dishes..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full h-10 pl-10 pr-4 bg-stone-50 border border-stone-100 rounded-xl text-sm focus:outline-none focus:border-amber-600 transition-colors"
-                />
-            </div>
-        </div>
-    );
+    // Sticky Header Content (Only shown if Header Search is toggled ON)
+    const header = null;
 
+    // Sticky Category Tabs (Passed to MenuTemplate to be pinned at top-[8vh])
     const tabs = (
         <MenuCategoryTabs
             categories={categories}
@@ -119,7 +101,7 @@ export function MenuPage() {
 
     const cartTrigger = cart.items.length > 0 ? (
         <button
-            onClick={() => setIsCartOpen(true)}
+            onClick={handleOpenCart}
             className="w-full flex items-center justify-between p-4 bg-amber-600 rounded-2xl text-white shadow-xl shadow-amber-600/30 active:scale-95 transition-all"
         >
             <div className="flex items-center gap-3">
@@ -140,20 +122,13 @@ export function MenuPage() {
             header={header}
             tabs={tabs}
             cartTrigger={cartTrigger}
-            bottomSheet={isCartOpen && (
-                <CartBottomSheet
-                    onClose={() => setIsCartOpen(false)}
-                    onPlaceOrder={handlePlaceOrder}
-                    isPlacingOrder={isPlacingOrder}
-                />
-            )}
         >
             <div className="flex flex-col gap-4">
                 {filteredItems.length === 0 ? (
                     <div className="py-20 text-center flex flex-col items-center gap-2">
                         <p className="text-stone-400 font-medium">No items found</p>
                         <button 
-                            onClick={() => {setSelectedCategoryId('all'); setSearchQuery('');}}
+                            onClick={() => {if(categories.length > 0) setSelectedCategoryId(categories[0]._id); search.setQuery('');}}
                             className="text-amber-600 text-sm font-semibold"
                         >
                             Clear filters
@@ -189,3 +164,5 @@ export function MenuPage() {
         </MenuTemplate>
     );
 }
+
+// --- HELPERS / TYPE GUARDS ---

@@ -4,6 +4,7 @@ import { SectionTabs } from '../../components/organisms/SectionTabs';
 import { FloorTemplate } from '../../components/templates/FloorTemplate';
 import { FloorPlanCanvas } from '../../components/organisms/FloorPlanCanvas';
 import { TableActionSheet } from '../../components/organisms/TableActionSheet';
+import { ConfirmationModal } from '../../components/molecules/ConfirmationModal';
 import { useAuthStore } from '../../stores/authStore';
 import { useCartStore } from '../../stores/cartStore';
 import { UserRole } from '../../types/enums';
@@ -23,11 +24,11 @@ export function FloorPage() {
     const [actionTable, setActionTable] = useState<Table | null>(null);
     const [apiError, setApiError] = useState<string | null>(null);
     const [apiLogs, setApiLogs] = useState<{ time: string, msg: string }[]>([]);
+    const [pendingTable, setPendingTable] = useState<Table | null>(null);
 
     const user = useAuthStore((s) => s.user);
     const setCurrentFloorName = useAuthStore((s) => s.setCurrentFloorName);
-    const setTable = useCartStore((s) => s.setTable);
-    const clearCart = useCartStore((s) => s.clearCart);
+    const cart = useCartStore();
     const navigate = useNavigate();
 
     const isAdmin = user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN;
@@ -98,18 +99,45 @@ export function FloorPage() {
     };
 
     const handleTableTap = (table: Table) => {
+        // Only trigger "Clear Cart?" if switching to a DIFFERENT table with unsaved items
+        if (cart.items.length > 0 && cart.tableId && !mongoIdsMatch(cart.tableId, table._id)) {
+            setPendingTable(table);
+            return;
+        }
+
+        processTableTap(table);
+    };
+
+    const processTableTap = (table: Table) => {
         if (table.status === 'occupied') {
             setActionTable(table);
         } else {
-            clearCart();
-            setTable(table._id);
+            // ONLY clear the cart if it's a DIFFERENT table.
+            // If it's the same table, we want to keep the items!
+            if (cart.tableId && !mongoIdsMatch(cart.tableId, table._id)) {
+                cart.clearCart();
+            }
+            
+            cart.setTable(table._id);
             navigate('/menu');
         }
     };
 
+    const handleClearCartConfirm = () => {
+        if (pendingTable) {
+            cart.clearCart();
+            processTableTap(pendingTable);
+            setPendingTable(null);
+        }
+    };
+
+    const handleClearCartCancel = () => {
+        setPendingTable(null);
+    };
+
     const handleAddMenu = () => {
         if (!actionTable) return;
-        setTable(actionTable._id);
+        cart.setTable(actionTable._id);
         navigate('/menu');
         setActionTable(null);
     };
@@ -123,8 +151,8 @@ export function FloorPage() {
                 console.error('Failed to complete order:', err);
             }
         }
-        clearCart();
-        setTable(actionTable._id);
+        cart.clearCart();
+        cart.setTable(actionTable._id);
         navigate('/menu');
         setActionTable(null);
     };
@@ -246,6 +274,22 @@ export function FloorPage() {
                         </div>
                     ))}
                 </div>
+
+                {/* Confirmation Modals */}
+                {pendingTable && (() => {
+                    // Try to find the name of the table currently in the cart
+                    const currentTable = tables.find(t => mongoIdsMatch(t._id, cart.tableId));
+                    const currentTableName = currentTable?.displayName || currentTable?.name || 'another table';
+                    
+                    return (
+                        <ConfirmationModal 
+                            title="Clear cart?"
+                            message={`You have unsaved items for ${currentTableName}. Clear cart and switch to ${pendingTable.displayName || pendingTable.name}?`}
+                            onConfirm={handleClearCartConfirm}
+                            onCancel={handleClearCartCancel}
+                        />
+                    );
+                })()}
             </FloorTemplate>
         );
     } catch (renderErr: any) {

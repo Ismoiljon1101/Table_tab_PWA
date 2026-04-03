@@ -84,7 +84,7 @@ export function CartBottomSheet({ onClose, onPlaceOrder, isPlacingOrder }: CartB
                         loading={isPlacingOrder}
                         onClick={onPlaceOrder}
                     >
-                        Place Order
+                        {cart.editingOrderId ? 'Update Order' : 'Place Order'}
                     </Button>
                 </div>
             </div>

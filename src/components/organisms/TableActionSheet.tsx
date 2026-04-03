@@ -28,7 +28,7 @@ export function TableActionSheet({ table, onClose, onAddMenu, onNewCustomer, onC
                         onClick={onAddMenu}
                     >
                         <span className="text-xl">📋</span>
-                        <span>Add Menu Items</span>
+                        <span>Add-ons</span>
                     </button>
                     <button 
                         className="flex items-center gap-3 w-full p-4 rounded-xl bg-stone-50 border border-stone-100 text-stone-800 font-medium transition-all duration-200 active:scale-95 active:bg-stone-100" 

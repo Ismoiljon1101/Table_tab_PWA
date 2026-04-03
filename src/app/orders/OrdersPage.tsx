@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { StandardPageTemplate } from '../../components/templates/StandardPageTemplate';
 import { OrderCard } from '../../components/molecules/OrderCard';
 import { useOrdersStore } from '../../stores/ordersStore';
@@ -11,6 +11,7 @@ import type { Order, Table } from '../../types';
  */
 export function OrdersPage() {
     const { orders, isLoading, fetchTodayOrders, subscribeToUpdates } = useOrdersStore();
+    const [activeTab, setActiveTab] = useState<'active' | 'finished'>('active');
 
     useEffect(() => {
         fetchTodayOrders();
@@ -19,7 +20,9 @@ export function OrdersPage() {
     }, [fetchTodayOrders, subscribeToUpdates]);
 
     const activeOrders = orders.filter((o) => o.status !== OrderStatus.SERVED);
-    const servedOrders = orders.filter((o) => o.status === OrderStatus.SERVED);
+    const finishedOrders = orders.filter((o) => o.status === OrderStatus.SERVED);
+
+    const displayOrders = activeTab === 'active' ? activeOrders : finishedOrders;
 
     const getTableName = (order: Order): string => {
         if (typeof order.tableId === 'object' && order.tableId !== null) {
@@ -39,55 +42,39 @@ export function OrdersPage() {
 
     return (
         <StandardPageTemplate header={null}>
-            <div className="flex flex-col gap-6">
-                <div className="flex flex-col gap-1 mb-2">
-                    <h2 className="text-2xl font-bold text-stone-900 tracking-tight">Orders</h2>
-                    <p className="text-sm text-stone-500">Real-time status of today's service</p>
+            <div className="flex flex-col gap-5">
+                {/* High-density Toggles */}
+                <div className="flex bg-stone-100 p-1 rounded-[20px] gap-1 sticky top-0 z-[60] shadow-sm">
+                    <button
+                        onClick={() => setActiveTab('active')}
+                        className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest rounded-[16px] transition-all ${activeTab === 'active' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400'}`}
+                    >
+                        Active ({activeOrders.length})
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('finished')}
+                        className={`flex-1 py-3 text-[11px] font-black uppercase tracking-widest rounded-[16px] transition-all ${activeTab === 'finished' ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-400'}`}
+                    >
+                        Finished ({finishedOrders.length})
+                    </button>
                 </div>
 
-                {orders.length === 0 ? (
-                    <div className="flex flex-col items-center gap-3 py-20 px-4 text-center">
+                {displayOrders.length === 0 ? (
+                    <div className="flex flex-col items-center gap-3 py-20 px-4 text-center opacity-30">
                         <span className="text-5xl">📋</span>
-                        <h3 className="text-lg font-semibold text-stone-900">No orders today</h3>
-                        <p className="text-stone-500">Orders will appear here as they come in</p>
+                        <h3 className="text-lg font-black text-stone-900 uppercase">Empty {activeTab}</h3>
                     </div>
                 ) : (
-                    <>
-                        {activeOrders.length > 0 && (
-                            <section>
-                                <h3 className="text-sm font-semibold text-stone-600 mb-3 uppercase tracking-wide">
-                                    Active ({activeOrders.length})
-                                </h3>
-                                <div className="flex flex-col gap-3">
-                                    {activeOrders.map((order, idx) => (
-                                        <OrderCard
-                                            key={order._id}
-                                            order={order}
-                                            tableName={getTableName(order)}
-                                            delay={idx * 40}
-                                        />
-                                    ))}
-                                </div>
-                            </section>
-                        )}
-
-                        {servedOrders.length > 0 && (
-                            <section>
-                                <h3 className="text-sm font-semibold text-stone-400 mb-3 uppercase tracking-wide">
-                                    Completed ({servedOrders.length})
-                                </h3>
-                                <div className="flex flex-col gap-3">
-                                    {servedOrders.map((order) => (
-                                        <OrderCard
-                                            key={order._id}
-                                            order={order}
-                                            tableName={getTableName(order)}
-                                        />
-                                    ))}
-                                </div>
-                            </section>
-                        )}
-                    </>
+                    <div className="flex flex-col gap-4">
+                        {displayOrders.map((order, idx) => (
+                            <OrderCard
+                                key={order._id}
+                                order={order}
+                                tableName={getTableName(order)}
+                                delay={idx * 40}
+                            />
+                        ))}
+                    </div>
                 )}
             </div>
         </StandardPageTemplate>

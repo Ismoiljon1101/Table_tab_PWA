@@ -17,6 +17,8 @@ interface OrdersState {
     subscribeToUpdates: () => () => void;
     /** Update a single order in the local state */
     upsertOrder: (order: Order) => void;
+    /** Update order status on the backend */
+    updateOrderStatus: (orderId: string, status: string) => Promise<void>;
 }
 
 export const useOrdersStore = create<OrdersState>((set, get) => ({
@@ -62,5 +64,14 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
             }
             return { orders: [order, ...state.orders] };
         });
+    },
+    
+    updateOrderStatus: async (orderId, status) => {
+        try {
+            const { data } = await api.patch<Order>(`/orders/${orderId}/status`, { status });
+            get().upsertOrder(data);
+        } catch (err) {
+            console.error('Failed to update order status:', err);
+        }
     },
 }));

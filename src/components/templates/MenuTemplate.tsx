@@ -15,12 +15,12 @@ interface MenuTemplateProps {
 export function MenuTemplate({ header, tabs, children, cartTrigger, bottomSheet }: MenuTemplateProps) {
     return (
         <div className="flex flex-col min-h-screen bg-white">
-            <div className="sticky top-14 z-40 bg-white shadow-sm shadow-stone-100">
+            <div className="sticky top-0 z-40 bg-white border-b border-stone-100">
                 {header}
                 {tabs}
             </div>
 
-            <main className="flex-1 p-4 pb-32">
+            <main className="flex-1 px-4 py-3 pb-32">
                 {children}
             </main>
 

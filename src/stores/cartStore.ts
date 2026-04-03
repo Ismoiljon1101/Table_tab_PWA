@@ -1,14 +1,18 @@
 import { create } from 'zustand';
-import type { CartItem, ItemModifier } from '../types';
+import type { CartItem, ItemModifier, Order } from '../types';
 
 interface CartState {
     /** The table this cart is for */
     tableId: string | null;
     /** All items currently in the cart */
     items: CartItem[];
+    /** The ID of the existing order we are editing, if any */
+    editingOrderId: string | null;
 
     /** Set which table we are taking order for */
     setTable: (tableId: string) => void;
+    /** Load an existing order into the cart for editing */
+    loadOrder: (order: Order) => void;
     /** Add an item to the cart */
     addItem: (item: CartItem) => void;
     /** Update quantity for an existing item */
@@ -37,8 +41,26 @@ function itemKey(menuItemId: string, modifiers: ItemModifier[]): string {
 export const useCartStore = create<CartState>((set, get) => ({
     tableId: null,
     items: [],
+    editingOrderId: null,
 
     setTable: (tableId) => set({ tableId }),
+
+    loadOrder: (order) => {
+        const cartItems: CartItem[] = order.items.map(item => ({
+            menuItemId: item.menuItemId.toString(),
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            modifiers: item.modifiers || [],
+            notes: item.notes || ''
+        }));
+
+        set({
+            tableId: (order.tableId as any)._id || order.tableId.toString(),
+            items: cartItems,
+            editingOrderId: order._id
+        });
+    },
 
     addItem: (item) => {
         const key = itemKey(item.menuItemId, item.modifiers);
@@ -86,7 +108,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         });
     },
 
-    clearCart: () => set({ tableId: null, items: [] }),
+    clearCart: () => set({ tableId: null, items: [], editingOrderId: null }),
 
     totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
 
