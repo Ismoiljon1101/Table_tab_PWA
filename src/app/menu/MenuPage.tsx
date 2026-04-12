@@ -1,18 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchStore } from '../../stores/searchStore';
-import { Search, ShoppingCart } from 'lucide-react';
+import { ShoppingCart } from 'lucide-react';
 import { MenuTemplate } from '../../components/templates/MenuTemplate';
 import { MenuCategoryTabs } from '../../components/organisms/MenuCategoryTabs';
 import { MenuItemCard } from '../../components/molecules/MenuItemCard';
 import { ModifierModal } from '../../components/organisms/ModifierModal';
-import { CartBottomSheet } from '../../components/organisms/CartBottomSheet';
 import { useCartStore } from '../../stores/cartStore';
 import api from '../../services/api';
 import type { MenuItem, Category } from '../../types';
+import { MenuSkeleton } from '../../components/atoms/MenuSkeleton';
 
 /**
  * MenuPage
  * Refactored to use Atomic Design (Templates, Organisms, Molecules).
+ * Enhanced with Cinematic Motion and Staggered entry.
  */
 export function MenuPage() {
     // --- STATE MANAGEMENT ---
@@ -23,8 +25,8 @@ export function MenuPage() {
     const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
 
     // --- SHARED STORES ---
-    const cart = useCartStore(); // Handles global order state
-    const search = useSearchStore(); // Consumes search query from the top header (AppShell)
+    const cart = useCartStore();
+    const search = useSearchStore();
 
     useEffect(() => {
         fetchData();
@@ -40,7 +42,6 @@ export function MenuPage() {
             setItems(itemRes.data);
             setCategories(catRes.data);
             
-            // Auto-select the first category by default
             if (catRes.data.length > 0 && !selectedCategoryId) {
                 setSelectedCategoryId(catRes.data[0]._id);
             }
@@ -55,42 +56,28 @@ export function MenuPage() {
         window.dispatchEvent(new CustomEvent('open-cart'));
     };
 
-    /**
-     * Computes the final list of items based on Category selection and Global Search (from App Bar).
-     * This is memoized to prevent re-filtering on every re-render.
-     */
     const filteredItems = useMemo(() => {
         let result = items;
-
-        // 1. Filter by category (Defaulting to the selected one)
         if (selectedCategoryId) {
             result = result.filter((i: MenuItem) => {
                 const catId = typeof i.category === 'string' ? i.category : i.category?._id;
                 return catId === selectedCategoryId;
             });
         }
-
-        // 2. Filter by search query (shared from top AppShell)
         if (search.query) {
             result = result.filter((i: MenuItem) => i.name.toLowerCase().includes(search.query.toLowerCase()));
         }
-        
         return result;
     }, [items, selectedCategoryId, search.query]);
 
     if (loading && items.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-[60dvh] gap-3">
-                <div className="w-8 h-8 rounded-full border-4 border-stone-200 border-t-amber-600 animate-spin" />
-                <p className="text-stone-400 font-medium">Loading delicious options...</p>
+            <div className="flex flex-col p-4 gap-3 overflow-hidden">
+                {[...Array(8)].map((_, i) => <MenuSkeleton key={i} />)}
             </div>
         );
     }
 
-    // Sticky Header Content (Only shown if Header Search is toggled ON)
-    const header = null;
-
-    // Sticky Category Tabs (Passed to MenuTemplate to be pinned at top-[8vh])
     const tabs = (
         <MenuCategoryTabs
             categories={categories}
@@ -100,9 +87,13 @@ export function MenuPage() {
     );
 
     const cartTrigger = cart.items.length > 0 ? (
-        <button
+        <motion.button
+            layout
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            whileTap={{ scale: 0.95 }}
             onClick={handleOpenCart}
-            className="w-full flex items-center justify-between p-4 bg-amber-600 rounded-2xl text-white shadow-xl shadow-amber-600/30 active:scale-95 transition-all"
+            className="w-full flex items-center justify-between p-4 bg-amber-600 rounded-2xl text-white shadow-xl shadow-amber-600/30 transition-all font-bold"
         >
             <div className="flex items-center gap-3">
                 <div className="relative">
@@ -111,48 +102,67 @@ export function MenuPage() {
                         {cart.totalItems()}
                     </span>
                 </div>
-                <span className="font-bold">View Cart</span>
+                <span>View Cart</span>
             </div>
-            <span className="text-lg font-bold">Total: {cart.totalItems()}</span>
-        </button>
+            <span className="text-lg uppercase">Total: {cart.totalItems()}</span>
+        </motion.button>
     ) : null;
 
     return (
         <MenuTemplate
-            header={header}
+            header={null}
             tabs={tabs}
             cartTrigger={cartTrigger}
         >
             <div className="flex flex-col gap-4">
-                {filteredItems.length === 0 ? (
-                    <div className="py-20 text-center flex flex-col items-center gap-2">
-                        <p className="text-stone-400 font-medium">No items found</p>
-                        <button 
-                            onClick={() => {if(categories.length > 0) setSelectedCategoryId(categories[0]._id); search.setQuery('');}}
-                            className="text-amber-600 text-sm font-semibold"
+                <AnimatePresence mode="wait">
+                    {filteredItems.length === 0 ? (
+                        <motion.div 
+                            key="empty"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="py-20 text-center flex flex-col items-center gap-2"
                         >
-                            Clear filters
-                        </button>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                        {filteredItems.map((item) => (
-                            <MenuItemCard
-                                key={item._id}
-                                item={item}
-                                onClick={() => setSelectedItem(item)}
-                                onAdd={() => cart.addItem({
-                                    menuItemId: item._id,
-                                    name: item.name,
-                                    unitPrice: item.price,
-                                    quantity: 1,
-                                    modifiers: [],
-                                    notes: ''
-                                })}
-                            />
-                        ))}
-                    </div>
-                )}
+                            <p className="text-stone-400 font-medium italic">No delicious options found</p>
+                            <button 
+                                onClick={() => {if(categories.length > 0) setSelectedCategoryId(categories[0]._id); search.setQuery('');}}
+                                colonial-button="true"
+                                className="text-amber-600 text-xs font-bold tracking-widest uppercase border-b border-amber-600/30"
+                            >
+                                Clear filters
+                            </button>
+                        </motion.div>
+                    ) : (
+                        <motion.div 
+                            key={selectedCategoryId || 'all'}
+                            initial="hidden"
+                            animate="show"
+                            exit="hidden"
+                            variants={{
+                                show: { transition: { staggerChildren: 0.05 } }
+                            }}
+                            className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5"
+                        >
+                            {filteredItems.map((item, idx) => (
+                                <MenuItemCard
+                                    key={item._id}
+                                    item={item}
+                                    index={idx}
+                                    onClick={() => setSelectedItem(item)}
+                                    onAdd={() => cart.addItem({
+                                        menuItemId: item._id,
+                                        name: item.name,
+                                        unitPrice: item.price,
+                                        quantity: 1,
+                                        modifiers: [],
+                                        notes: ''
+                                    })}
+                                />
+                            ))}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
             {selectedItem && (

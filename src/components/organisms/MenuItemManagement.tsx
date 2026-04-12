@@ -1,4 +1,4 @@
-import { useState, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, forwardRef, useImperativeHandle, useMemo } from 'react';
 import { Edit2, Trash2, UtensilsCrossed, Filter, Plus } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { Badge } from '../atoms/Badge';
@@ -7,6 +7,10 @@ import { formatCurrency } from '../../utils/format';
 import api from '../../services/api';
 import { ItemFormModal } from './ItemFormModal';
 import { CategoryChips } from '../molecules/CategoryChips';
+import { Switch } from '../atoms/Switch';
+import { useAuthStore } from '../../stores/authStore';
+import { UserRole } from '../../types/enums';
+import { useSearchStore } from '../../stores/searchStore';
 
 interface MenuItemManagementProps {
     selectedCategoryProp?: string;
@@ -25,6 +29,10 @@ export const MenuItemManagement = forwardRef<{ handleAdd: () => void }, MenuItem
         const [loading, setLoading] = useState(true);
         const [isModalOpen, setIsModalOpen] = useState(false);
         const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+
+        const user = useAuthStore((s) => s.user);
+        const isAdmin = user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN;
+        const search = useSearchStore();
 
         // Sync with props or use internal state
         const selectedCategory = selectedCategoryProp || internalSelectedCategory;
@@ -63,6 +71,18 @@ export const MenuItemManagement = forwardRef<{ handleAdd: () => void }, MenuItem
         setIsModalOpen(true);
     };
 
+    const handleToggleAvailability = async (item: MenuItem) => {
+        try {
+            // Optimistic update
+            setItems(prev => prev.map(i => i._id === item._id ? { ...i, isAvailable: !i.isAvailable } : i));
+            await api.patch(`/menu/${item._id}/toggle-availability`);
+        } catch (err) {
+            // Rollback
+            setItems(prev => prev.map(i => i._id === item._id ? { ...i, isAvailable: item.isAvailable } : i));
+            console.error('Failed to toggle availability:', err);
+        }
+    };
+
     const handleDelete = async (id: string) => {
         if (!window.confirm('Are you sure you want to delete this menu item?')) return;
         try {
@@ -84,12 +104,28 @@ export const MenuItemManagement = forwardRef<{ handleAdd: () => void }, MenuItem
         handleModalClose();
     };
 
-    const filteredItems = selectedCategory === 'all' 
-        ? items 
-        : items.filter((i) => {
-            const catId = typeof i.category === 'string' ? i.category : i.category?._id;
-            return catId === selectedCategory;
-        });
+    const filteredItems = useMemo(() => {
+        let result = items;
+
+        // 1. Filter by category
+        if (selectedCategory !== 'all') {
+            result = result.filter((i) => {
+                const catId = typeof i.category === 'string' ? i.category : i.category?._id;
+                return catId === selectedCategory;
+            });
+        }
+
+        // 2. Filter by search query
+        if (search.query) {
+            const q = search.query.toLowerCase();
+            result = result.filter((i) => 
+                i.name.toLowerCase().includes(q) || 
+                (i.code && i.code.toLowerCase().includes(q))
+            );
+        }
+
+        return result;
+    }, [items, selectedCategory, search.query]);
 
     if (loading && items.length === 0) {
         return (
@@ -107,9 +143,11 @@ export const MenuItemManagement = forwardRef<{ handleAdd: () => void }, MenuItem
                     <UtensilsCrossed size={40} className="text-stone-200" />
                     <p className="text-stone-500 font-medium">No items found</p>
                     <p className="text-xs text-stone-400">Add items to your menu to take orders.</p>
-                    <Button variant="primary" size="sm" onClick={() => setIsModalOpen(true)} className="mt-2">
-                        <Plus size={16} className="mr-1" /> Add Your First Item
-                    </Button>
+                    {isAdmin && (
+                        <Button variant="primary" size="sm" onClick={() => setIsModalOpen(true)} className="mt-2">
+                            <Plus size={16} className="mr-1" /> Add Your First Item
+                        </Button>
+                    )}
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-3">
@@ -136,19 +174,32 @@ export const MenuItemManagement = forwardRef<{ handleAdd: () => void }, MenuItem
                                     </span>
                                 </div>
                             </div>
-                            <div className="flex gap-1">
-                                <button 
-                                    onClick={() => handleEdit(item)}
-                                    className="p-2 text-stone-400 active:text-amber-600 transition-colors"
-                                >
-                                    <Edit2 size={18} />
-                                </button>
-                                <button 
-                                    onClick={() => handleDelete(item._id)}
-                                    className="p-2 text-stone-400 active:text-red-500 transition-colors"
-                                >
-                                    <Trash2 size={18} />
-                                </button>
+                            <div className="flex gap-2 items-center">
+                                {isAdmin && (
+                                    <button 
+                                        onClick={() => handleEdit(item)}
+                                        className="p-2 text-stone-400 active:text-amber-600 transition-colors"
+                                    >
+                                        <Edit2 size={18} />
+                                    </button>
+                                )}
+                                
+                                <div className="flex items-center px-1">
+                                    <Switch 
+                                        checked={item.isAvailable} 
+                                        onChange={() => handleToggleAvailability(item)}
+                                        size="sm"
+                                    />
+                                </div>
+
+                                {isAdmin && (
+                                    <button 
+                                        onClick={() => handleDelete(item._id)}
+                                        className="p-2 text-stone-400 active:text-red-500 transition-colors"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                )}
                             </div>
                         </div>
                     ))}
