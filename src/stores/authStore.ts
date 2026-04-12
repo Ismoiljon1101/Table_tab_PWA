@@ -113,17 +113,12 @@ export const useAuthStore = create<AuthState>()(
             refreshSession: async () => {
                 try {
                     const { data } = await api.post('/auth/refresh');
+                    // Only update tokens — do NOT overwrite user/restaurant
+                    // because the refresh endpoint only returns new tokens, not user data.
+                    // Overwriting with undefined would clear auth state and cause redirect loops.
                     setTokens(data.accessToken, data.refreshToken);
-                    set({ user: data.user, restaurant: data.restaurant });
-
-                    const sock = connectSocket();
-                    if (!sock.connected) {
-                        sock.on('connect', () => joinRestaurant(data.restaurant._id));
-                    } else {
-                        joinRestaurant(data.restaurant._id);
-                    }
                 } catch (err) {
-                    console.warn('Session refresh failed, user may need to re-login eventually');
+                    console.warn('Session refresh failed silently, user will need to re-login when tokens fully expire');
                 }
             },
 

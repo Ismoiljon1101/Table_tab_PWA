@@ -8,6 +8,8 @@ interface CartState {
     items: CartItem[];
     /** The ID of the existing order we are editing, if any */
     editingOrderId: string | null;
+    /** The timestamp of the order when we loaded it, used for optimistic locking */
+    baseUpdatedAt: string | null;
 
     /** Set which table we are taking order for */
     setTable: (tableId: string) => void;
@@ -42,23 +44,28 @@ export const useCartStore = create<CartState>((set, get) => ({
     tableId: null,
     items: [],
     editingOrderId: null,
+    baseUpdatedAt: null,
 
     setTable: (tableId) => set({ tableId }),
 
     loadOrder: (order) => {
-        const cartItems: CartItem[] = order.items.map(item => ({
-            menuItemId: item.menuItemId.toString(),
-            name: item.name,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            modifiers: item.modifiers || [],
-            notes: item.notes || ''
-        }));
+        const cartItems: CartItem[] = order.items
+            // Exclude tombstone items — they're for kitchen audit only, not editing
+            .filter(item => item.status !== 'deleted' && item.quantity > 0)
+            .map(item => ({
+                menuItemId: item.menuItemId.toString(),
+                name: item.name,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                modifiers: item.modifiers || [],
+                notes: item.notes || ''
+            }));
 
         set({
             tableId: (order.tableId as any)._id || order.tableId.toString(),
             items: cartItems,
-            editingOrderId: order._id
+            editingOrderId: order._id,
+            baseUpdatedAt: order.updatedAt as string || null
         });
     },
 
@@ -108,7 +115,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         });
     },
 
-    clearCart: () => set({ tableId: null, items: [], editingOrderId: null }),
+    clearCart: () => set({ tableId: null, items: [], editingOrderId: null, baseUpdatedAt: null }),
 
     totalItems: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
 

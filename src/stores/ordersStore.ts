@@ -58,6 +58,16 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
         set((state) => {
             const idx = state.orders.findIndex((o) => o._id === order._id);
             if (idx >= 0) {
+                const existingOrder = state.orders[idx];
+                // Compare timestamps to prevent older socket events from overwriting newer local state
+                const incomingTime = order.updatedAt ? new Date(order.updatedAt).getTime() : 0;
+                const existingTime = existingOrder.updatedAt ? new Date(existingOrder.updatedAt).getTime() : 0;
+
+                if (incomingTime < existingTime) {
+                    console.log(`⚠️ Ignored stale update for order ${order.orderNumber}`);
+                    return state;
+                }
+
                 const updated = [...state.orders];
                 updated[idx] = order;
                 return { orders: updated };

@@ -9,6 +9,7 @@ import { useAuthStore } from '../../stores/authStore';
 import { useCartStore } from '../../stores/cartStore';
 import { UserRole } from '../../types/enums';
 import api from '../../services/api';
+import { getSocket } from '../../services/socket';
 import { mongoIdsMatch } from '../../libs/mongoId';
 import type { Table, Section } from '../../types';
 
@@ -55,6 +56,21 @@ export function FloorPage() {
             }
         };
         init();
+    }, []);
+
+    /** Subscribe to real-time table updates from other tablets */
+    useEffect(() => {
+        const socket = getSocket();
+        if (!socket) return;
+
+        const handleTableChanged = (updatedTable: Table) => {
+            setTables(prev => prev.map(t =>
+                mongoIdsMatch(t._id, updatedTable._id) ? { ...t, ...updatedTable } : t
+            ));
+        };
+
+        socket.on('table-status-changed', handleTableChanged);
+        return () => { socket.off('table-status-changed', handleTableChanged); };
     }, []);
 
     const fetchTables = async () => {
@@ -146,7 +162,7 @@ export function FloorPage() {
         if (!actionTable) return;
         if (actionTable.currentOrderId) {
             try {
-                await api.put(`/orders/${actionTable.currentOrderId}/status`, { status: 'served' });
+                await api.patch(`/orders/${actionTable.currentOrderId}/status`, { status: 'served' });
             } catch (err) {
                 console.error('Failed to complete order:', err);
             }
@@ -160,7 +176,7 @@ export function FloorPage() {
     const handleCancelOrder = async () => {
         if (!actionTable?.currentOrderId) return;
         try {
-            await api.put(`/orders/${actionTable.currentOrderId}/status`, { status: 'served' });
+            await api.patch(`/orders/${actionTable.currentOrderId}/status`, { status: 'cancelled' });
             await fetchTables();
         } catch (err) {
             console.error('Failed to cancel order:', err);

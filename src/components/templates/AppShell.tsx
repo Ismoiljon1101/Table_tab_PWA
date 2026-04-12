@@ -75,7 +75,10 @@ export function AppShell() {
 
             if (cart.editingOrderId) {
                 // UPDATE Existing Order
-                await api.put(`/orders/${cart.editingOrderId}`, { items: payload.items });
+                await api.patch(`/orders/${cart.editingOrderId}`, { 
+                    items: payload.items,
+                    baseUpdatedAt: cart.baseUpdatedAt 
+                });
             } else {
                 // CREATE New Order
                 await api.post('/orders', payload);
@@ -84,9 +87,10 @@ export function AppShell() {
             cart.clearCart();
             setIsCartOpen(false);
             window.location.href = '/'; // Go back to floor
-        } catch (err) {
+        } catch (err: any) {
             console.error('Failed to save order:', err);
-            alert('Failed to save order. Please check console.');
+            const backendError = err.response?.data?.message || 'Failed to save order. Please try again.';
+            alert(Array.isArray(backendError) ? backendError[0] : backendError);
         } finally {
             setIsPlacingOrder(false);
         }

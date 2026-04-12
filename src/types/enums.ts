@@ -12,6 +12,7 @@ export enum OrderStatus {
     PREPARING = 'preparing',
     READY = 'ready',
     SERVED = 'served',
+    CANCELLED = 'cancelled',
 }
 
 /** Mirrors BE: src/orders/schemas/order.schema.ts */
@@ -20,6 +21,7 @@ export enum OrderItemStatus {
     PREPARING = 'preparing',
     READY = 'ready',
     SERVED = 'served',
+    DELETED = 'deleted',
 }
 
 /** Mirrors BE: src/tables/schemas/table.schema.ts */

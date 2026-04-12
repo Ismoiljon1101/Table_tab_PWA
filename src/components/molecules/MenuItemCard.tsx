@@ -17,18 +17,17 @@ interface MenuItemCardProps {
 export function MenuItemCard({ item, onAdd, onClick, index = 0 }: MenuItemCardProps) {
     return (
         <div
-            className="flex items-center gap-3 p-4 bg-white rounded-xl border border-stone-100 shadow-sm animate-[slideUp_0.3s_ease-out_both] cursor-pointer hover:border-amber-200 transition-all duration-300 active:scale-[0.98]"
+            className="flex items-center gap-2 p-2 bg-white rounded-xl border border-stone-50 shadow-sm animate-[slideUp_0.3s_ease-out_both] cursor-pointer hover:border-amber-200 transition-all duration-300 active:scale-[0.98]"
             style={{ animationDelay: `${index * 30}ms` }}
             onClick={onClick}
         >
-            <div className="flex-1 flex flex-col gap-0.5">
-                <div className="flex items-center gap-2">
-                    <span className="text-base font-semibold text-stone-900">{item.name}</span>
-                    {item.isPopular && <Badge label="Popular" variant="preparing" />}
+            <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+                <div className="flex items-center gap-2 overflow-hidden">
+                    <span className="text-[15px] font-bold text-stone-900 truncate">{item.name}</span>
+                    {item.isPopular && <Badge label="P" variant="preparing" />}
                 </div>
-                <span className="text-base font-bold text-amber-600">{formatCurrency(item.price)}</span>
                 {item.modifiers.length > 0 && (
-                    <span className="text-xs text-stone-400 mt-1">
+                    <span className="text-[11px] text-stone-400 truncate">
                         {item.modifiers.map((m) => m.name).join(' · ')}
                     </span>
                 )}

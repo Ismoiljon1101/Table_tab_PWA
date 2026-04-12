@@ -44,6 +44,22 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+/** Handle concurrent refresh attempts */
+let isRefreshing = false;
+let failedQueue: any[] = [];
+
+const processQueue = (error: any, token: string | null = null) => {
+    failedQueue.forEach((prom) => {
+        if (error) {
+            prom.reject(error);
+        } else {
+            prom.resolve(token);
+        }
+    });
+
+    failedQueue = [];
+};
+
 /** Response interceptor: log and handle 401 → attempt refresh */
 api.interceptors.response.use(
     (response) => {
@@ -51,11 +67,26 @@ api.interceptors.response.use(
         return response;
     },
     async (error) => {
-        console.error(`❌ [API Error] ${error.response?.status || 'Network Error'} ${error.config?.url}`, error.response?.data);
-        const originalRequest = error.config;
+        const { config, response } = error;
+        const originalRequest = config;
+        const isRefreshRequest = originalRequest.url?.includes('auth/refresh');
 
-        if (error.response?.status === 401 && refreshToken && !originalRequest._retry) {
+        if (response?.status === 401 && refreshToken && !originalRequest._retry && !isRefreshRequest) {
+            if (isRefreshing) {
+                return new Promise((resolve, reject) => {
+                    failedQueue.push({ resolve, reject });
+                })
+                    .then((token) => {
+                        originalRequest.headers.Authorization = `Bearer ${token}`;
+                        return api(originalRequest);
+                    })
+                    .catch((err) => {
+                        return Promise.reject(err);
+                    });
+            }
+
             originalRequest._retry = true;
+            isRefreshing = true;
 
             try {
                 const res = await axios.post(
@@ -67,15 +98,21 @@ api.interceptors.response.use(
                 const { accessToken: newAccess, refreshToken: newRefresh } = res.data;
                 setTokens(newAccess, newRefresh);
 
+                processQueue(null, newAccess);
                 originalRequest.headers.Authorization = `Bearer ${newAccess}`;
                 return api(originalRequest);
-            } catch {
+            } catch (refreshError) {
+                processQueue(refreshError, null);
                 console.warn('⚠️ Refresh token failed or expired. Force-logging out.');
                 clearTokens();
                 window.location.href = '/login';
+                return Promise.reject(refreshError);
+            } finally {
+                isRefreshing = false;
             }
         }
 
+        console.error(`❌ [API Error] ${response?.status || 'Network Error'} ${config?.url}`, response?.data);
         return Promise.reject(error);
     },
 );
