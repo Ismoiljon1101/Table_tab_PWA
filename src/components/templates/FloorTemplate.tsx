@@ -13,34 +13,24 @@ interface FloorTemplateProps {
  */
 export function FloorTemplate({ header, stats, children, actionSheet }: FloorTemplateProps) {
     return (
-        <div className="flex flex-col h-full bg-stone-50/30 overflow-hidden">
-            {/* Sub-Header (Sections & Info) - 12vh (Total Info budget with AppShell is 20vh) */}
-            <div className="h-[12vh] bg-white shadow-sm shadow-stone-100 overflow-hidden flex flex-col justify-center">
-                <div className="flex-1 flex flex-col justify-center">
-                    {header}
-                </div>
-                {stats && (
-                    <div className="px-4 pb-2">
-                        {stats}
-                    </div>
-                )}
+        <div className="flex flex-col h-full bg-[#fafafa] overflow-hidden">
+            {/* Header Area */}
+            <div className="flex-shrink-0 bg-white shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                {header}
+                {stats && <div className="px-4 pb-2">{stats}</div>}
             </div>
 
-            {/* Main Floor Area - 70vh */}
-            <main className="h-[70vh] flex items-center justify-center p-2 relative overflow-hidden">
-                {/* 
-                  LAYOUT NOTE: 
-                  - Width is strictly 95% of screen.
-                  - Height is strictly 70% of screen.
-                  - Scrolling is disabled (Fixed Dashboard).
-                  - TODO: Add internal scrolling here if requested in the future.
-                */}
-                <div className="w-[95%] h-full bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden flex items-center justify-center">
+            {/* Main World Area */}
+            <main className="flex-1 relative flex flex-col items-center justify-center p-3 sm:p-4 overflow-hidden">
+                <div className="w-full h-full bg-white rounded-[32px] shadow-[0_8px_32px_rgba(0,0,0,0.04)] border border-stone-200/50 overflow-hidden relative">
                     {children}
                 </div>
             </main>
 
-            {actionSheet}
+            {/* Floatover UI */}
+            <div className="fixed inset-0 pointer-events-none z-[100]">
+                {actionSheet}
+            </div>
         </div>
     );
 }

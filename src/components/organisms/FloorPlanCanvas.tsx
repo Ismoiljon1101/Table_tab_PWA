@@ -224,34 +224,51 @@ export function FloorPlanCanvas({
     return (
         <div
             ref={canvasRef}
-            className="relative w-full h-full overflow-hidden bg-stone-50 rounded-3xl border border-stone-200/60 shadow-inner cursor-grab active:cursor-grabbing select-none touch-none"
+            className="relative w-full h-full overflow-hidden bg-[#fafafa] rounded-3xl border border-stone-200/60 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01)] cursor-grab active:cursor-grabbing select-none touch-none"
             onPointerDown={handleCanvasPointerDown}
             onPointerMove={handleCanvasPointerMove}
             onPointerUp={handleCanvasPointerUp}
             onPointerLeave={handleCanvasPointerUp}
         >
-            {/* Dot grid — moves with pan via ref, never triggers React render */}
+            {/* ── HYBRID GRID SYSTEM ── */}
             <div
                 ref={gridRef}
                 className="absolute inset-0 pointer-events-none"
                 style={{
-                    backgroundImage: 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
-                    backgroundSize: `${CELL_SIZE_PX}px ${CELL_SIZE_PX}px`,
+                    backgroundImage: `
+                        radial-gradient(circle, #e2e8f0 1.2px, transparent 1.2px),
+                        linear-gradient(to right, #f1f1f1 0.5px, transparent 0.5px),
+                        linear-gradient(to bottom, #f1f1f1 0.5px, transparent 0.5px)
+                    `,
+                    backgroundSize: `
+                        ${CELL_SIZE_PX}px ${CELL_SIZE_PX}px,
+                        ${CELL_SIZE_PX}px ${CELL_SIZE_PX}px,
+                        ${CELL_SIZE_PX}px ${CELL_SIZE_PX}px
+                    `,
                     backgroundPosition: '50% 50%',
-                    opacity: 0.5,
                 }}
             />
 
-            {/* Origin crosshair */}
+            {/* Major X/Y Axis Lines (The "Visual Lines") */}
+            <div
+                className="absolute pointer-events-none"
+                style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
+            >
+                 <div className="absolute w-[200vw] h-[1px] bg-stone-200/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                 <div className="absolute h-[200vh] w-[1px] bg-stone-200/60 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
+            </div>
+
+            {/* Subtle Vignette */}
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.015)_100%)]" />
+
+            {/* Origin Crosshair (Dot) */}
             <div
                 ref={originRef}
                 className="absolute pointer-events-none"
                 style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
             >
-                <div className="absolute w-[200vw] h-[1px] bg-amber-300/40 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                <div className="absolute h-[200vh] w-[1px] bg-amber-300/40 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
-                <div className="relative flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 border-2 border-amber-400 shadow-sm">
-                    <Crosshair size={12} className="text-amber-500" />
+                <div className="relative flex items-center justify-center w-6 h-6 rounded-full border border-stone-300 bg-white/80 shadow-sm backdrop-blur-sm">
+                    <div className="w-1.5 h-1.5 rounded-full bg-stone-500" />
                 </div>
             </div>
 
