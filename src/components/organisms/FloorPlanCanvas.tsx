@@ -230,46 +230,27 @@ export function FloorPlanCanvas({
             onPointerUp={handleCanvasPointerUp}
             onPointerLeave={handleCanvasPointerUp}
         >
-            {/* ── HYBRID GRID SYSTEM ── */}
+            {/* ── PURE DOT GRID (MINIMALIST) ── */}
             <div
                 ref={gridRef}
                 className="absolute inset-0 pointer-events-none"
                 style={{
-                    backgroundImage: `
-                        radial-gradient(circle, #e2e8f0 1.2px, transparent 1.2px),
-                        linear-gradient(to right, #f1f1f1 0.5px, transparent 0.5px),
-                        linear-gradient(to bottom, #f1f1f1 0.5px, transparent 0.5px)
-                    `,
-                    backgroundSize: `
-                        ${CELL_SIZE_PX}px ${CELL_SIZE_PX}px,
-                        ${CELL_SIZE_PX}px ${CELL_SIZE_PX}px,
-                        ${CELL_SIZE_PX}px ${CELL_SIZE_PX}px
-                    `,
+                    backgroundImage: `radial-gradient(circle, #e2e8f0 1.2px, transparent 1.2px)`,
+                    backgroundSize: `${CELL_SIZE_PX}px ${CELL_SIZE_PX}px`,
                     backgroundPosition: '50% 50%',
                 }}
             />
 
-            {/* Major X/Y Axis Lines (The "Visual Lines") */}
-            <div
-                className="absolute pointer-events-none"
-                style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
-            >
-                 <div className="absolute w-[200vw] h-[1px] bg-stone-200/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                 <div className="absolute h-[200vh] w-[1px] bg-stone-200/60 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
-            </div>
-
             {/* Subtle Vignette */}
-            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.015)_100%)]" />
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_40%,rgba(0,0,0,0.01)_100%)]" />
 
-            {/* Origin Crosshair (Dot) */}
+            {/* Simple Origin Indicator (Just a dot) */}
             <div
                 ref={originRef}
                 className="absolute pointer-events-none"
                 style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
             >
-                <div className="relative flex items-center justify-center w-6 h-6 rounded-full border border-stone-300 bg-white/80 shadow-sm backdrop-blur-sm">
-                    <div className="w-1.5 h-1.5 rounded-full bg-stone-500" />
-                </div>
+                <div className="w-2 h-2 rounded-full bg-stone-300" />
             </div>
 
             {/*
