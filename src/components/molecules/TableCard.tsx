@@ -29,10 +29,10 @@ interface TableCardProps {
 /** Status-to-style mapping: Solid 3D (CoC Style) */
 const STATUS_THEME: Record<TableStatus, { bg: string, text: string, shadow: string, base: string }> = {
     [TableStatus.AVAILABLE]: { 
-        bg: 'bg-white', 
-        text: 'text-stone-400', 
-        shadow: 'rgba(0,0,0,0.03)',
-        base: 'border-b-stone-100'
+        bg: 'bg-[#C1702C]', 
+        text: 'text-white', 
+        shadow: 'rgba(193, 112, 44, 0.2)',
+        base: 'border-b-[#8B4D1A]'
     },
     [TableStatus.OCCUPIED]: { 
         bg: 'bg-amber-500', 
@@ -108,17 +108,32 @@ export function TableCard({
         <button
             data-table={table._id}
             className={`
-                flex flex-col items-center justify-center rounded-2xl border-t border-x 
-                border-b-[5px] active:border-b-[2px] active:translate-y-[3px]
+                flex flex-col items-center justify-center rounded-2xl border-t border-x
                 transition-all duration-100 animate-[scaleIn_0.4s_cubic-bezier(0.2,0,0,1)_backwards]
-                ${theme.bg} ${theme.text} ${theme.base}
-                ${isDraggingThis ? '' : 'active:scale-95'} ${isAdmin ? 'cursor-grab' : ''}
-                shadow-[0_8px_16px_-4px_rgba(0,0,0,0.08)]
+                ${theme.bg} ${theme.text}
+                ${isDraggingThis ? '' : 'active:scale-[0.98] active:translate-y-[4px]'} ${isAdmin ? 'cursor-grab' : ''}
+                
+                /* ── MULTI-LAYER 3D EXTRUSION ── */
+                shadow-[
+                    0px_1px_0px_#8B4D1A,
+                    0px_2px_0px_#8B4D1A,
+                    0px_3px_0px_#8B4D1A,
+                    0px_4px_0px_#8B4D1A,
+                    0px_5px_0px_#8B4D1A,
+                    0px_6px_0px_#8B4D1A,
+                    0px_12px_24px_-8px_rgba(0,0,0,0.5) /* Deep Ground Shadow */
+                ]
+                active:shadow-[
+                    0px_1px_0px_#8B4D1A,
+                    0px_2px_0px_#8B4D1A,
+                    0px_4px_8px_-2px_rgba(0,0,0,0.3)
+                ]
             `}
             style={{
                 ...draggingStyle,
-                borderColor: table.status === TableStatus.AVAILABLE ? '#f1f1f1' : 'rgba(0,0,0,0.05)',
-                borderBottomColor: table.status === TableStatus.AVAILABLE ? '#e2e8f0' : undefined
+                borderColor: table.status === TableStatus.AVAILABLE ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                borderTopColor: 'rgba(255,255,255,0.3)', // Rim Light
+                borderLeftColor: 'rgba(255,255,255,0.1)',
             }}
             onClick={onClick}
             onPointerDown={(e) => {
