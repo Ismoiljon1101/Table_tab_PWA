@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Users, Plus, Crosshair } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { TableCard } from '../molecules/TableCard';
@@ -48,6 +49,7 @@ export function FloorPlanCanvas({
     const sceneRef = useRef<HTMLDivElement>(null); // transform target for all tables
     const gridRef = useRef<HTMLDivElement>(null);  // grid overlay
     const originRef = useRef<HTMLDivElement>(null); // crosshair
+    const ghostRef = useRef<HTMLButtonElement>(null); // drag ghost — direct DOM position
     const restaurant = useAuthStore((s) => s.restaurant);
 
     /* ─── Pan state (no React state — pure refs for performance) ─── */
@@ -101,11 +103,18 @@ export function FloorPlanCanvas({
     const performRotation = async (orientation: 'H' | 'V') => {
         if (!rotationTarget) return;
         const table = rotationTarget;
-        
-        // H = 2x1, V = 1x2 (in base schema units).
-        // TableCard uses these to determine orientation, magnitude is capacity-based.
-        const newWidth = orientation === 'H' ? 2 : 1;
-        const newHeight = orientation === 'H' ? 1 : 2;
+
+        /*
+         * Swap the existing dimensions rather than hardcoding 2/1.
+         * H → wider dimension becomes width (landscape).
+         * V → wider dimension becomes height (portrait).
+         */
+        const w = table.width ?? 1;
+        const h = table.height ?? 1;
+        const larger  = Math.max(w, h);
+        const smaller = Math.min(w, h);
+        const newWidth  = orientation === 'H' ? larger  : smaller;
+        const newHeight = orientation === 'H' ? smaller : larger;
 
         onTableUpdate?.(table._id, { width: newWidth, height: newHeight });
         setRotationTarget(null);
@@ -120,6 +129,7 @@ export function FloorPlanCanvas({
     const { dragging, onTableTouchStart, handleMove, cancelLongPress, onDragMove, onDragEnd, isDragging } = useTableDrag({
         canvasRef,
         panRef,
+        ghostRef,
         onDropped: handleDropped,
         onRotate: handleRotate,
     });
@@ -288,6 +298,7 @@ export function FloorPlanCanvas({
             {/*
               Drag ghost — rendered OUTSIDE sceneRef so position:fixed
               is truly relative to the viewport, not offset by the scene transform.
+              Position is driven by ghostRef direct DOM mutation (GPU translate3d).
             */}
             {dragging && (
                 <TableCard
@@ -299,8 +310,9 @@ export function FloorPlanCanvas({
                     panY={0}
                     isAdmin={isAdmin}
                     isDraggingThis={true}
-                    draggingScreenX={dragging.screenX}
-                    draggingScreenY={dragging.screenY}
+                    ghostRef={ghostRef}
+                    initialDragX={dragging.initialX}
+                    initialDragY={dragging.initialY}
                     onClick={() => {}}
                     onLongPressCancel={cancelLongPress}
                 />
@@ -314,13 +326,14 @@ export function FloorPlanCanvas({
                 <Crosshair size={12} /> Origin
             </button>
 
-            {/* Rotation Modal */}
-            {rotationTarget && (
+            {/* Rotation Modal — portalled to document.body to escape transformed stacking context */}
+            {rotationTarget && createPortal(
                 <AlignmentPicker 
                     tableName={rotationTarget.name}
                     onClose={() => setRotationTarget(null)}
                     onSelect={performRotation}
-                />
+                />,
+                document.body
             )}
         </div>
     );

@@ -16,10 +16,15 @@ interface TableCardProps {
     isAdmin?: boolean;
     /** Whether this specific table is currently being dragged */
     isDraggingThis?: boolean;
-    /** Screen X while dragging (overrides computed position) */
-    draggingScreenX?: number;
-    /** Screen Y while dragging (overrides computed position) */
-    draggingScreenY?: number;
+    /** Ref forwarded from FloorPlanCanvas — ghostRef drives position via translate3d */
+    ghostRef?: React.RefObject<HTMLButtonElement | null>;
+    /**
+     * Initial finger X when drag was activated.
+     * Sets the ghost's first JSX style position so it appears under the finger immediately.
+     */
+    initialDragX?: number;
+    /** Initial finger Y when drag was activated. */
+    initialDragY?: number;
     /** Fires when admin starts a long-press with touch position and pointer ID */
     onLongPressStart?: (clientX: number, clientY: number, pointerId: number) => void;
     /** Fires when long-press is cancelled (touch moved or released early) */
@@ -61,8 +66,9 @@ export function TableCard({
     panY,
     isAdmin = false,
     isDraggingThis = false,
-    draggingScreenX,
-    draggingScreenY,
+    ghostRef,
+    initialDragX = 0,
+    initialDragY = 0,
     onLongPressStart,
     onLongPressCancel,
 }: TableCardProps) {
@@ -88,15 +94,23 @@ export function TableCard({
         touchAction: 'none',
     };
 
-    const draggingStyle: React.CSSProperties = isDraggingThis && draggingScreenX !== undefined ? {
+    /**
+     * Ghost drag style.
+     * position:fixed + translate3d seeded with the initial finger position.
+     * After first pointermove, ghostRef.current.style.transform takes over (GPU path).
+     * This guarantees the ghost appears directly under the finger with zero jump.
+     */
+    const draggingStyle: React.CSSProperties = isDraggingThis ? {
         ...gridStyle,
         position: 'fixed',
-        left: draggingScreenX,
-        top: draggingScreenY,
+        left: 0,
+        top: 0,
+        transform: `translate3d(${initialDragX}px, ${initialDragY}px, 0) translate(-50%, -50%)`,
         opacity: 0.95,
-        scale: 1.05,
+        scale: '1.05',
         boxShadow: `0 20px 40px ${theme.shadow}`,
         cursor: 'grabbing',
+        willChange: 'transform',
     } : gridStyle;
 
     const rawLabel = table.displayName || table.name;
@@ -106,6 +120,7 @@ export function TableCard({
 
     return (
         <button
+            ref={isDraggingThis ? ghostRef : undefined}
             data-table={table._id}
             className={`
                 flex flex-col items-center justify-center rounded-2xl border-t border-x
