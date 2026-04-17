@@ -26,6 +26,7 @@ export function FloorPage() {
     const [apiError, setApiError] = useState<string | null>(null);
     const [apiLogs, setApiLogs] = useState<{ time: string, msg: string }[]>([]);
     const [pendingTable, setPendingTable] = useState<Table | null>(null);
+    const [isActionLoading, setIsActionLoading] = useState(false);
 
     const user = useAuthStore((s) => s.user);
     const setCurrentFloorName = useAuthStore((s) => s.setCurrentFloorName);
@@ -151,37 +152,74 @@ export function FloorPage() {
         setPendingTable(null);
     };
 
-    const handleAddMenu = () => {
+    const handleAddMenu = async () => {
         if (!actionTable) return;
-        cart.setTable(actionTable._id);
-        navigate('/menu');
-        setActionTable(null);
+        setIsActionLoading(true);
+        addLog(`Loading order for ${actionTable.name}...`);
+        try {
+            if (actionTable.currentOrderId) {
+                const res = await api.get(`/orders/${actionTable.currentOrderId}`);
+                cart.loadOrder(res.data);
+                addLog('Order loaded into cart');
+            } else {
+                cart.clearCart();
+                cart.setTable(actionTable._id);
+            }
+            navigate('/menu');
+            setActionTable(null);
+        } catch (err) {
+            console.error('Failed to load add-ons:', err);
+            addLog('ERR: Failed to load order');
+        } finally {
+            setIsActionLoading(false);
+        }
     };
 
     const handleNewCustomer = async () => {
         if (!actionTable) return;
-        if (actionTable.currentOrderId) {
-            try {
+        setIsActionLoading(true);
+        addLog(`Serving table ${actionTable.name}...`);
+        try {
+            if (actionTable.currentOrderId) {
                 await api.patch(`/orders/${actionTable.currentOrderId}/status`, { status: 'served' });
-            } catch (err) {
-                console.error('Failed to complete order:', err);
+                addLog('Order marked as served');
+            } else {
+                addLog('No OrderID - Force clearing table...');
+                await api.patch(`/tables/${actionTable._id}`, { status: 'available', currentOrderId: null });
             }
+            await fetchTables();
+            cart.clearCart();
+            cart.setTable(actionTable._id);
+            navigate('/menu');
+            setActionTable(null);
+        } catch (err) {
+            console.error('Failed to complete order:', err);
+            addLog(`ERR: ${ (err as any)?.response?.data?.message || 'Failed to serve' }`);
+        } finally {
+            setIsActionLoading(false);
         }
-        cart.clearCart();
-        cart.setTable(actionTable._id);
-        navigate('/menu');
-        setActionTable(null);
     };
 
     const handleCancelOrder = async () => {
-        if (!actionTable?.currentOrderId) return;
+        if (!actionTable) return;
+        setIsActionLoading(true);
+        addLog(`Cancelling order for ${actionTable.name}...`);
         try {
-            await api.patch(`/orders/${actionTable.currentOrderId}/status`, { status: 'cancelled' });
+            if (actionTable.currentOrderId) {
+                await api.patch(`/orders/${actionTable.currentOrderId}/status`, { status: 'cancelled' });
+                addLog('Order cancelled');
+            } else {
+                addLog('No OrderID - Force clearing table...');
+                await api.patch(`/tables/${actionTable._id}`, { status: 'available', currentOrderId: null });
+            }
             await fetchTables();
+            setActionTable(null);
         } catch (err) {
             console.error('Failed to cancel order:', err);
+            addLog(`ERR: ${ (err as any)?.response?.data?.message || 'Cancel failed' }`);
+        } finally {
+            setIsActionLoading(false);
         }
-        setActionTable(null);
     };
 
     /**
@@ -263,6 +301,7 @@ export function FloorPage() {
                         onAddMenu={handleAddMenu}
                         onNewCustomer={handleNewCustomer}
                         onCancelOrder={handleCancelOrder}
+                        isLoading={isActionLoading}
                     />
                 )}
             >

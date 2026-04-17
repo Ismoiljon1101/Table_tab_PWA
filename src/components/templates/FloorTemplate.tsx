@@ -27,7 +27,7 @@ export function FloorTemplate({ header, stats, children, actionSheet }: FloorTem
                 </div>
             </main>
 
-            {/* Floatover UI */}
+            {/* Floatover UI layer - using pointer-events-none to prevent blocking floor interactions */}
             <div className="fixed inset-0 pointer-events-none z-[100]">
                 {actionSheet}
             </div>

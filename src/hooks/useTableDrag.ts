@@ -55,6 +55,12 @@ export function useTableDrag({ canvasRef, panRef, ghostRef, onDropped, onRotate 
     const rotateTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pressPosRef = useRef<{ x: number; y: number } | null>(null);
     const pointerIdRef = useRef<number | null>(null);
+    /**
+     * TRACKER: Set true when a drag or rotation activates.
+     * Survives through pointerup→click sequence so FloorPlanCanvas
+     * can suppress the spurious tap that fires after a long-press.
+     */
+    const wasLongPressedRef = useRef(false);
 
     /**
      * Write ghost position directly to DOM via translate3d.
@@ -77,14 +83,11 @@ export function useTableDrag({ canvasRef, panRef, ghostRef, onDropped, onRotate 
     ) => {
         pressPosRef.current = { x: clientX, y: clientY };
         pointerIdRef.current = pointerId;
+        wasLongPressedRef.current = false; // Reset for each new touch
 
         // Stage 1: Drag Activation (500ms)
         longPressTimer.current = setTimeout(() => {
-            /*
-             * Bake the exact finger position into DragState.
-             * The ghost TableCard mounts with initialX/Y in its JSX style →
-             * appears directly under the finger, zero jump.
-             */
+            wasLongPressedRef.current = true; // Mark: suppress next click
             setDragging({ table, initialX: clientX, initialY: clientY });
 
             if (canvasRef.current && pointerIdRef.current !== null) {
@@ -177,5 +180,7 @@ export function useTableDrag({ canvasRef, panRef, ghostRef, onDropped, onRotate 
         onDragMove,
         onDragEnd,
         isDragging: dragging !== null,
+        /** True if a long-press (drag/rotate) activated — caller should skip the next click */
+        ignoreNextTap: wasLongPressedRef.current,
     };
 }
