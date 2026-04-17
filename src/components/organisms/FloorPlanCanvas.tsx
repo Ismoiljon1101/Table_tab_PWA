@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Users, Plus, Crosshair } from 'lucide-react';
+import { Users, Plus, Crosshair, Lock, LockOpen } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { TableCard } from '../molecules/TableCard';
 import { useTableDrag } from '../../hooks/useTableDrag';
@@ -51,6 +51,7 @@ export function FloorPlanCanvas({
     const originRef = useRef<HTMLDivElement>(null); // crosshair
     const ghostRef = useRef<HTMLButtonElement>(null); // drag ghost — direct DOM position
     const restaurant = useAuthStore((s) => s.restaurant);
+    const [isLocked, setIsLocked] = useState(false);
 
     /* ─── Pan state (no React state — pure refs for performance) ─── */
     const panRef = useRef({ x: 0, y: 0 });
@@ -139,13 +140,14 @@ export function FloorPlanCanvas({
 
     const handleCanvasPointerDown = useCallback((e: React.PointerEvent) => {
         if ((e.target as HTMLElement).closest('[data-table]')) return;
+        if (isLocked) return; // Ignore panning if locked
         if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
         isPanningRef.current = true;
         dragStartRef.current = { px: panRef.current.x, py: panRef.current.y, cx: e.clientX, cy: e.clientY };
         lastMoveRef.current = { x: e.clientX, y: e.clientY, t: performance.now() };
         velocityRef.current = { vx: 0, vy: 0 };
         (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    }, []);
+    }, [isLocked]);
 
     const handleCanvasPointerMove = useCallback((e: React.PointerEvent) => {
         if (isDragging) { 
@@ -156,7 +158,7 @@ export function FloorPlanCanvas({
         // Help determine if a long-press on a table should be cancelled
         handleMove(e.clientX, e.clientY);
 
-        if (!isPanningRef.current || !dragStartRef.current) return;
+        if (isLocked || !isPanningRef.current || !dragStartRef.current) return;
 
         const dx = e.clientX - dragStartRef.current.cx;
         const dy = e.clientY - dragStartRef.current.cy;
@@ -171,7 +173,7 @@ export function FloorPlanCanvas({
             velocityRef.current = { vx: rawVx * 0.6 + velocityRef.current.vx * 0.4, vy: rawVy * 0.6 + velocityRef.current.vy * 0.4 };
         }
         lastMoveRef.current = { x: e.clientX, y: e.clientY, t: now };
-    }, [isDragging, onDragMove, handleMove, applyPan]);
+    }, [isDragging, onDragMove, handleMove, applyPan, isLocked]);
 
     const handleCanvasPointerUp = useCallback((e: React.PointerEvent) => {
         if (isDragging) { 
@@ -259,14 +261,6 @@ export function FloorPlanCanvas({
                 }}
             />
 
-            {/* Major X/Y Axis Lines */}
-            <div
-                className="absolute pointer-events-none"
-                style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
-            >
-                <div className="absolute w-[200vw] h-[1px] bg-stone-200/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                <div className="absolute h-[200vh] w-[1px] bg-stone-200/60 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
-            </div>
 
             {/* Subtle Vignette */}
             <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.015)_100%)]" />
@@ -337,13 +331,23 @@ export function FloorPlanCanvas({
                 />
             )}
 
-            {/* Reset to origin */}
-            <button
-                className="absolute bottom-3 right-3 flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-stone-200 rounded-full text-xs text-stone-500 font-medium shadow-sm active:scale-95 transition-transform z-20"
-                onClick={resetPan}
-            >
-                <Crosshair size={12} /> Origin
-            </button>
+            {/* Controls */}
+            <div className="absolute bottom-3 right-3 flex flex-col gap-2 z-20">
+                <button
+                    className={`flex items-center justify-center w-9 h-9 backdrop-blur-sm border rounded-full shadow-sm active:scale-95 transition-all ${isLocked ? 'bg-red-500 border-red-600 text-white' : 'bg-white/90 border-stone-200 text-stone-500'}`}
+                    onClick={() => setIsLocked(!isLocked)}
+                    title={isLocked ? 'Unlock Floor' : 'Lock Floor'}
+                >
+                    {isLocked ? <Lock size={16} /> : <LockOpen size={16} />}
+                </button>
+
+                <button
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white/90 backdrop-blur-sm border border-stone-200 rounded-full text-xs text-stone-500 font-medium shadow-sm active:scale-95 transition-transform"
+                    onClick={resetPan}
+                >
+                    <Crosshair size={12} /> Origin
+                </button>
+            </div>
 
             {/* Rotation Modal — portalled to document.body to escape transformed stacking context */}
             {rotationTarget && createPortal(
