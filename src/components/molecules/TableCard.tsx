@@ -16,30 +16,46 @@ interface TableCardProps {
     isAdmin?: boolean;
     /** Whether this specific table is currently being dragged */
     isDraggingThis?: boolean;
-    /** Screen X while dragging (overrides computed position) */
-    draggingScreenX?: number;
-    /** Screen Y while dragging (overrides computed position) */
-    draggingScreenY?: number;
+    /** Ref forwarded from FloorPlanCanvas — ghostRef drives position via translate3d */
+    ghostRef?: React.RefObject<HTMLButtonElement | null>;
+    /**
+     * Initial finger X when drag was activated.
+     * Sets the ghost's first JSX style position so it appears under the finger immediately.
+     */
+    initialDragX?: number;
+    /** Initial finger Y when drag was activated. */
+    initialDragY?: number;
     /** Fires when admin starts a long-press with touch position and pointer ID */
     onLongPressStart?: (clientX: number, clientY: number, pointerId: number) => void;
     /** Fires when long-press is cancelled (touch moved or released early) */
     onLongPressCancel?: () => void;
 }
 
-/** Status-to-style mapping */
-const STATUS_CLASSES: Record<TableStatus, string> = {
-    [TableStatus.AVAILABLE]: 'border-emerald-300 bg-gradient-to-b from-emerald-50 to-white text-emerald-700',
-    [TableStatus.OCCUPIED]: 'border-amber-300 bg-gradient-to-b from-amber-50 to-white text-amber-700',
-    [TableStatus.RESERVED]: 'border-blue-300 bg-gradient-to-b from-blue-50 to-white text-blue-700',
+/** Status-to-style mapping: Solid 3D (CoC Style) */
+const STATUS_THEME: Record<TableStatus, { bg: string, text: string, shadow: string, base: string }> = {
+    [TableStatus.AVAILABLE]: { 
+        bg: 'bg-[#C1702C]', 
+        text: 'text-white', 
+        shadow: 'rgba(193, 112, 44, 0.2)',
+        base: 'border-b-[#8B4D1A]'
+    },
+    [TableStatus.OCCUPIED]: { 
+        bg: 'bg-amber-500', 
+        text: 'text-white', 
+        shadow: 'rgba(180, 83, 9, 0.3)',
+        base: 'border-b-amber-700'
+    },
+    [TableStatus.RESERVED]: { 
+        bg: 'bg-blue-600', 
+        text: 'text-white', 
+        shadow: 'rgba(29, 78, 216, 0.3)',
+        base: 'border-b-blue-800'
+    },
 };
 
 /**
  * TableCard molecule
- * Positions itself on the coordinate canvas using the grid formula:
- *   screenX = canvasW/2 + table.position.x * cellSize + panX
- *   screenY = canvasH/2 - table.position.y * cellSize + panY
- * Sized by grid units: width = table.width * cellSize, height = table.height * cellSize.
- * Supports long-press drag for admins.
+ * Positions itself on the coordinate canvas using the grid formula.
  */
 export function TableCard({
     table,
@@ -50,19 +66,14 @@ export function TableCard({
     panY,
     isAdmin = false,
     isDraggingThis = false,
-    draggingScreenX,
-    draggingScreenY,
+    ghostRef,
+    initialDragX = 0,
+    initialDragY = 0,
     onLongPressStart,
     onLongPressCancel,
 }: TableCardProps) {
-    const statusClass = STATUS_CLASSES[table.status] ?? 'border-stone-200 bg-white text-stone-700';
+    const theme = STATUS_THEME[table.status] ?? STATUS_THEME[TableStatus.AVAILABLE];
 
-    /**
-     * Corrected Dimension Logic:
-     * - "Magnitude" (how big the table is) is driven by capacity.
-     * - "Orientation" (horizontal vs vertical) is driven by the DB width/height ratio.
-     * This keeps table size consistent while allowing rotation.
-     */
     const cap = table.capacity ?? 2;
     const baseDim = 1 + (Math.max(0, cap - 2) / 2) * 0.6;
     
@@ -72,42 +83,73 @@ export function TableCard({
 
     const gridStyle: React.CSSProperties = {
         position: 'absolute',
-        width: `${safeW * cellSize}px`,
-        height: `${safeH * cellSize}px`,
-        /** calc(50% + ...) anchors from canvas center, then adds grid offset + pan */
+        width: `${safeW * cellSize - 4}px`, 
+        height: `${safeH * cellSize - 4}px`,
         left: `calc(50% + ${table.position.x * cellSize + panX}px)`,
         top: `calc(50% + ${-(table.position.y * cellSize) + panY}px)`,
         transform: `translate(-50%, -50%) rotate(${table.rotation ?? 0}deg)`,
         animationDelay: `${index * 40}ms`,
-        transition: isDraggingThis ? 'none' : 'left 0.15s ease, top 0.15s ease, width 0.2s ease, height 0.2s ease',
+        transition: isDraggingThis ? 'none' : 'left 0.2s cubic-bezier(0.2, 0, 0, 1), top 0.2s cubic-bezier(0.2, 0, 0, 1), width 0.3s ease, height 0.3s ease',
         zIndex: isDraggingThis ? 50 : 10,
         touchAction: 'none',
     };
 
-    /** When being dragged, use raw screen position from the drag hook */
-    const draggingStyle: React.CSSProperties = isDraggingThis && draggingScreenX !== undefined ? {
+    /**
+     * Ghost drag style.
+     * position:fixed + translate3d seeded with the initial finger position.
+     * After first pointermove, ghostRef.current.style.transform takes over (GPU path).
+     * This guarantees the ghost appears directly under the finger with zero jump.
+     */
+    const draggingStyle: React.CSSProperties = isDraggingThis ? {
         ...gridStyle,
         position: 'fixed',
-        left: draggingScreenX,
-        top: draggingScreenY,
-        opacity: 0.85,
-        boxShadow: '0 12px 32px rgba(0,0,0,0.18)',
+        left: 0,
+        top: 0,
+        transform: `translate3d(${initialDragX}px, ${initialDragY}px, 0) translate(-50%, -50%)`,
+        opacity: 0.95,
+        scale: '1.05',
+        boxShadow: `0 20px 40px ${theme.shadow}`,
         cursor: 'grabbing',
+        willChange: 'transform',
     } : gridStyle;
 
-    /** Clean label: remove trailing dot if present */
     const rawLabel = table.displayName || table.name;
     const cleanLabel = rawLabel.endsWith('.') ? rawLabel.slice(0, -1) : rawLabel;
-
-    /** 1x1 and Vertical tables: show max 4 chars to prevent UI break */
     const isNarrow = safeW <= 1.2;
     const displayLabel = isNarrow ? cleanLabel.slice(0, 4) : cleanLabel;
 
     return (
         <button
+            ref={isDraggingThis ? ghostRef : undefined}
             data-table={table._id}
-            className={`flex flex-col items-center justify-center ${isNarrow ? 'p-1' : 'p-2'} rounded-xl border-2 shadow-sm transition-opacity duration-200 animate-[scaleIn_0.3s_ease-out_backwards] ${statusClass} ${isDraggingThis ? 'scale-105' : 'active:scale-95'} ${isAdmin ? 'cursor-grab' : ''}`}
-            style={draggingStyle}
+            className={`
+                flex flex-col items-center justify-center rounded-2xl border-t border-x
+                transition-all duration-100 animate-[scaleIn_0.4s_cubic-bezier(0.2,0,0,1)_backwards]
+                ${theme.bg} ${theme.text}
+                ${isDraggingThis ? '' : 'active:scale-[0.98] active:translate-y-[4px]'} ${isAdmin ? 'cursor-grab' : ''}
+                
+                /* ── MULTI-LAYER 3D EXTRUSION ── */
+                shadow-[
+                    0px_1px_0px_#8B4D1A,
+                    0px_2px_0px_#8B4D1A,
+                    0px_3px_0px_#8B4D1A,
+                    0px_4px_0px_#8B4D1A,
+                    0px_5px_0px_#8B4D1A,
+                    0px_6px_0px_#8B4D1A,
+                    0px_12px_24px_-8px_rgba(0,0,0,0.5) /* Deep Ground Shadow */
+                ]
+                active:shadow-[
+                    0px_1px_0px_#8B4D1A,
+                    0px_2px_0px_#8B4D1A,
+                    0px_4px_8px_-2px_rgba(0,0,0,0.3)
+                ]
+            `}
+            style={{
+                ...draggingStyle,
+                borderColor: table.status === TableStatus.AVAILABLE ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                borderTopColor: 'rgba(255,255,255,0.3)', // Rim Light
+                borderLeftColor: 'rgba(255,255,255,0.1)',
+            }}
             onClick={onClick}
             onPointerDown={(e) => {
                 if (isAdmin && onLongPressStart) {
@@ -117,16 +159,26 @@ export function TableCard({
             onPointerUp={onLongPressCancel}
             title={cleanLabel}
         >
-            {/* Code badge — top right */}
-            {table.code && (
-                <span className="absolute -top-2 -right-2 bg-stone-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full leading-none z-10">
-                    {table.code}
-                </span>
-            )}
-
-            <span className={`text-xs font-bold w-full text-center leading-none ${isNarrow ? 'overflow-hidden whitespace-nowrap' : 'truncate'}`}>
+            {/* Table Number/Label */}
+            <span className={`text-[13px] font-black uppercase tracking-tighter ${isNarrow ? 'overflow-hidden whitespace-nowrap' : 'truncate'}`}>
                 {displayLabel}
             </span>
+
+            {/* Capacity / Code Badge */}
+            <div className={`flex items-center gap-1 mt-0.5 ${table.status === TableStatus.AVAILABLE ? 'opacity-30' : 'opacity-60'}`}>
+                <span className="text-[9px] font-black">{cap}P</span>
+                {table.code && (
+                    <>
+                        <span className="w-0.5 h-0.5 rounded-full bg-current" />
+                        <span className="text-[9px] font-black">{table.code}</span>
+                    </>
+                )}
+            </div>
+            
+            {/* Pulse effect for occupied */}
+            {table.status === TableStatus.OCCUPIED && (
+                <div className="absolute inset-0 rounded-2xl ring-2 ring-white/20 animate-pulse pointer-events-none" />
+            )}
         </button>
     );
 }

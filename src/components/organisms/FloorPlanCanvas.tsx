@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Users, Plus, Crosshair } from 'lucide-react';
 import { Button } from '../atoms/Button';
 import { TableCard } from '../molecules/TableCard';
@@ -48,6 +49,7 @@ export function FloorPlanCanvas({
     const sceneRef = useRef<HTMLDivElement>(null); // transform target for all tables
     const gridRef = useRef<HTMLDivElement>(null);  // grid overlay
     const originRef = useRef<HTMLDivElement>(null); // crosshair
+    const ghostRef = useRef<HTMLButtonElement>(null); // drag ghost — direct DOM position
     const restaurant = useAuthStore((s) => s.restaurant);
 
     /* ─── Pan state (no React state — pure refs for performance) ─── */
@@ -101,11 +103,18 @@ export function FloorPlanCanvas({
     const performRotation = async (orientation: 'H' | 'V') => {
         if (!rotationTarget) return;
         const table = rotationTarget;
-        
-        // H = 2x1, V = 1x2 (in base schema units).
-        // TableCard uses these to determine orientation, magnitude is capacity-based.
-        const newWidth = orientation === 'H' ? 2 : 1;
-        const newHeight = orientation === 'H' ? 1 : 2;
+
+        /*
+         * Swap the existing dimensions rather than hardcoding 2/1.
+         * H → wider dimension becomes width (landscape).
+         * V → wider dimension becomes height (portrait).
+         */
+        const w = table.width ?? 1;
+        const h = table.height ?? 1;
+        const larger  = Math.max(w, h);
+        const smaller = Math.min(w, h);
+        const newWidth  = orientation === 'H' ? larger  : smaller;
+        const newHeight = orientation === 'H' ? smaller : larger;
 
         onTableUpdate?.(table._id, { width: newWidth, height: newHeight });
         setRotationTarget(null);
@@ -117,9 +126,10 @@ export function FloorPlanCanvas({
         }
     };
 
-    const { dragging, onTableTouchStart, handleMove, cancelLongPress, onDragMove, onDragEnd, isDragging } = useTableDrag({
+    const { dragging, onTableTouchStart, handleMove, cancelLongPress, onDragMove, onDragEnd, isDragging, ignoreNextTap } = useTableDrag({
         canvasRef,
         panRef,
+        ghostRef,
         onDropped: handleDropped,
         onRotate: handleRotate,
     });
@@ -224,34 +234,51 @@ export function FloorPlanCanvas({
     return (
         <div
             ref={canvasRef}
-            className="relative w-full h-full overflow-hidden bg-stone-50 rounded-3xl border border-stone-200/60 shadow-inner cursor-grab active:cursor-grabbing select-none touch-none"
+            className="relative w-full h-full overflow-hidden bg-[#fafafa] rounded-3xl border border-stone-200/60 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01)] cursor-grab active:cursor-grabbing select-none touch-none"
             onPointerDown={handleCanvasPointerDown}
             onPointerMove={handleCanvasPointerMove}
             onPointerUp={handleCanvasPointerUp}
             onPointerLeave={handleCanvasPointerUp}
         >
-            {/* Dot grid — moves with pan via ref, never triggers React render */}
+            {/* ── HYBRID GRID SYSTEM (dots + subtle lines) ── */}
             <div
                 ref={gridRef}
                 className="absolute inset-0 pointer-events-none"
                 style={{
-                    backgroundImage: 'radial-gradient(circle, #d1d5db 1px, transparent 1px)',
-                    backgroundSize: `${CELL_SIZE_PX}px ${CELL_SIZE_PX}px`,
+                    backgroundImage: `
+                        radial-gradient(circle, #e2e8f0 1.2px, transparent 1.2px),
+                        linear-gradient(to right, #f1f1f1 0.5px, transparent 0.5px),
+                        linear-gradient(to bottom, #f1f1f1 0.5px, transparent 0.5px)
+                    `,
+                    backgroundSize: `
+                        ${CELL_SIZE_PX}px ${CELL_SIZE_PX}px,
+                        ${CELL_SIZE_PX}px ${CELL_SIZE_PX}px,
+                        ${CELL_SIZE_PX}px ${CELL_SIZE_PX}px
+                    `,
                     backgroundPosition: '50% 50%',
-                    opacity: 0.5,
                 }}
             />
 
-            {/* Origin crosshair */}
+            {/* Major X/Y Axis Lines */}
+            <div
+                className="absolute pointer-events-none"
+                style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
+            >
+                <div className="absolute w-[200vw] h-[1px] bg-stone-200/60 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+                <div className="absolute h-[200vh] w-[1px] bg-stone-200/60 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
+            </div>
+
+            {/* Subtle Vignette */}
+            <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_20%,rgba(0,0,0,0.015)_100%)]" />
+
+            {/* Origin Crosshair */}
             <div
                 ref={originRef}
                 className="absolute pointer-events-none"
                 style={{ left: '50%', top: '50%', transform: 'translate(-50%, -50%)' }}
             >
-                <div className="absolute w-[200vw] h-[1px] bg-amber-300/40 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
-                <div className="absolute h-[200vh] w-[1px] bg-amber-300/40 left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" />
-                <div className="relative flex items-center justify-center w-6 h-6 rounded-full bg-amber-100 border-2 border-amber-400 shadow-sm">
-                    <Crosshair size={12} className="text-amber-500" />
+                <div className="relative flex items-center justify-center w-6 h-6 rounded-full border border-stone-300 bg-white/80 shadow-sm backdrop-blur-sm">
+                    <div className="w-1.5 h-1.5 rounded-full bg-stone-500" />
                 </div>
             </div>
 
@@ -279,7 +306,7 @@ export function FloorPlanCanvas({
                             panY={0}
                             isAdmin={isAdmin}
                             isDraggingThis={false}
-                            onClick={() => !isDragging && onTableTap(table)}
+                            onClick={() => !isDragging && !ignoreNextTap && onTableTap(table)}
                             onLongPressStart={(cx, cy, pid) => isAdmin && onTableTouchStart(table, cx, cy, pid)}
                             onLongPressCancel={cancelLongPress}
                         />
@@ -290,6 +317,7 @@ export function FloorPlanCanvas({
             {/*
               Drag ghost — rendered OUTSIDE sceneRef so position:fixed
               is truly relative to the viewport, not offset by the scene transform.
+              Position is driven by ghostRef direct DOM mutation (GPU translate3d).
             */}
             {dragging && (
                 <TableCard
@@ -301,8 +329,9 @@ export function FloorPlanCanvas({
                     panY={0}
                     isAdmin={isAdmin}
                     isDraggingThis={true}
-                    draggingScreenX={dragging.screenX}
-                    draggingScreenY={dragging.screenY}
+                    ghostRef={ghostRef}
+                    initialDragX={dragging.initialX}
+                    initialDragY={dragging.initialY}
                     onClick={() => {}}
                     onLongPressCancel={cancelLongPress}
                 />
@@ -316,13 +345,14 @@ export function FloorPlanCanvas({
                 <Crosshair size={12} /> Origin
             </button>
 
-            {/* Rotation Modal */}
-            {rotationTarget && (
+            {/* Rotation Modal — portalled to document.body to escape transformed stacking context */}
+            {rotationTarget && createPortal(
                 <AlignmentPicker 
                     tableName={rotationTarget.name}
                     onClose={() => setRotationTarget(null)}
                     onSelect={performRotation}
-                />
+                />,
+                document.body
             )}
         </div>
     );
