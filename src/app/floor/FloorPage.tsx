@@ -74,7 +74,6 @@ export function FloorPage() {
             const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Unknown error';
             const status = (err as any)?.response?.status;
             setApiError(`Tables API failed: ${status ? `[${status}]` : ''} ${msg}`);
-            addLog(`Tables API Error: ${status || 'ERR'}`);
             console.error('Failed to fetch tables:', err);
         }
     };
@@ -146,6 +145,7 @@ export function FloorPage() {
     const handleAddMenu = async () => {
         if (!actionTable) return;
         setIsActionLoading(true);
+        try {
             if (actionTable.currentOrderId) {
                 const res = await api.get(`/orders/${actionTable.currentOrderId}`);
                 cart.loadOrder(res.data);
