@@ -4,8 +4,9 @@ import { VitePWA } from 'vite-plugin-pwa'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
+  const env = { ...process.env, ...loadEnv(mode, process.cwd(), '') };
   const port = parseInt(env.PORT || '5173', 10);
+
 
   return {
     plugins: [
@@ -59,21 +60,23 @@ export default defineConfig(({ mode }) => {
     server: {
       host: true,
       port: port,
-      strictPort: true, // Never fall back to another port — fail loudly if 5100 is in use
-      /**
-       * Vite dev proxy: all /v1/* requests are forwarded to the NestJS backend.
-       * This COMPLETELY eliminates CORS issues in development — the browser
-       * only ever talks to localhost:5100, and Vite proxies internally.
-       * Set VITE_BACKEND_URL in .env to change the target (default: 3500).
-       */
+      strictPort: true,
+      allowedHosts: ['ttb.ismaildev.uz', 'tabletap.ismaildev.uz'],
       proxy: {
         '/v1': {
-          target: env.VITE_BACKEND_URL || 'http://localhost:3500',
+          target: env.VITE_BACKEND_URL || env.VITE_API_URL?.replace('/v1', '') || 'http://localhost:5000',
           changeOrigin: true,
           secure: false,
         },
       },
     },
+    preview: {
+      host: true,
+      port: port,
+      strictPort: true,
+      allowedHosts: ['ttb.ismaildev.uz', 'tabletap.ismaildev.uz'],
+    },
+
   };
 })
 
