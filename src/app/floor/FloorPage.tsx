@@ -24,7 +24,6 @@ export function FloorPage() {
     const [loading, setLoading] = useState(true);
     const [actionTable, setActionTable] = useState<Table | null>(null);
     const [apiError, setApiError] = useState<string | null>(null);
-    const [apiLogs, setApiLogs] = useState<{ time: string, msg: string }[]>([]);
     const [pendingTable, setPendingTable] = useState<Table | null>(null);
     const [isActionLoading, setIsActionLoading] = useState(false);
 
@@ -35,23 +34,16 @@ export function FloorPage() {
 
     const isAdmin = user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN;
 
-    const addLog = (msg: string) => {
-        const time = new Date().toLocaleTimeString();
-        setApiLogs(prev => [{ time, msg }, ...prev].slice(0, 5));
-    };
 
     useEffect(() => {
         const init = async () => {
             setLoading(true);
             setApiError(null);
-            addLog('Initializing floor plan...');
             try {
                 await Promise.all([fetchTables(), fetchSections()]);
-                addLog('Initialization complete');
             } catch (err: any) {
                 console.error('Critical Floor Init Error:', err);
                 setApiError(`Init Error: ${err.message || 'Unknown crash'}`);
-                addLog(`CRASH: ${err.message}`);
             } finally {
                 setLoading(false);
             }
@@ -78,7 +70,6 @@ export function FloorPage() {
         try {
             const res = await api.get<Table[]>('/tables');
             setTables(res.data);
-            addLog(`Fetched ${res.data.length} tables`);
         } catch (err: unknown) {
             const msg = (err as any)?.response?.data?.message || (err as any)?.message || 'Unknown error';
             const status = (err as any)?.response?.status;
@@ -155,12 +146,9 @@ export function FloorPage() {
     const handleAddMenu = async () => {
         if (!actionTable) return;
         setIsActionLoading(true);
-        addLog(`Loading order for ${actionTable.name}...`);
-        try {
             if (actionTable.currentOrderId) {
                 const res = await api.get(`/orders/${actionTable.currentOrderId}`);
                 cart.loadOrder(res.data);
-                addLog('Order loaded into cart');
             } else {
                 cart.clearCart();
                 cart.setTable(actionTable._id);
@@ -169,7 +157,6 @@ export function FloorPage() {
             setActionTable(null);
         } catch (err) {
             console.error('Failed to load add-ons:', err);
-            addLog('ERR: Failed to load order');
         } finally {
             setIsActionLoading(false);
         }
@@ -178,13 +165,10 @@ export function FloorPage() {
     const handleNewCustomer = async () => {
         if (!actionTable) return;
         setIsActionLoading(true);
-        addLog(`Serving table ${actionTable.name}...`);
         try {
             if (actionTable.currentOrderId) {
                 await api.patch(`/orders/${actionTable.currentOrderId}/status`, { status: 'served' });
-                addLog('Order marked as served');
             } else {
-                addLog('No OrderID - Force clearing table...');
                 await api.patch(`/tables/${actionTable._id}`, { status: 'available', currentOrderId: null });
             }
             await fetchTables();
@@ -194,7 +178,6 @@ export function FloorPage() {
             setActionTable(null);
         } catch (err) {
             console.error('Failed to complete order:', err);
-            addLog(`ERR: ${ (err as any)?.response?.data?.message || 'Failed to serve' }`);
         } finally {
             setIsActionLoading(false);
         }
@@ -203,20 +186,16 @@ export function FloorPage() {
     const handleCancelOrder = async () => {
         if (!actionTable) return;
         setIsActionLoading(true);
-        addLog(`Cancelling order for ${actionTable.name}...`);
         try {
             if (actionTable.currentOrderId) {
                 await api.patch(`/orders/${actionTable.currentOrderId}/status`, { status: 'cancelled' });
-                addLog('Order cancelled');
             } else {
-                addLog('No OrderID - Force clearing table...');
                 await api.patch(`/tables/${actionTable._id}`, { status: 'available', currentOrderId: null });
             }
             await fetchTables();
             setActionTable(null);
         } catch (err) {
             console.error('Failed to cancel order:', err);
-            addLog(`ERR: ${ (err as any)?.response?.data?.message || 'Cancel failed' }`);
         } finally {
             setIsActionLoading(false);
         }
@@ -321,14 +300,6 @@ export function FloorPage() {
                     />
                 )}
 
-                {/* Debug Overlay */}
-                <div className="fixed bottom-20 left-4 right-4 z-[100] pointer-events-none flex flex-col items-start gap-1">
-                    {apiLogs.map((log, i) => (
-                        <div key={i} className="bg-black/80 text-white text-[9px] px-2 py-1 rounded">
-                            {log.time} - {log.msg}
-                        </div>
-                    ))}
-                </div>
 
                 {/* Confirmation Modals */}
                 {pendingTable && (() => {

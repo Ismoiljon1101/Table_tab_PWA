@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
 
 
   return {
+    base: '/',
     plugins: [
       tailwindcss(),
       react(),
@@ -55,6 +56,10 @@ export default defineConfig(({ mode }) => {
             },
           ],
         },
+        devOptions: {
+          enabled: true,
+          type: 'module',
+        },
       }),
     ],
     server: {
@@ -75,6 +80,13 @@ export default defineConfig(({ mode }) => {
       port: port,
       strictPort: true,
       allowedHosts: ['ttb.ismaildev.uz', 'tabletap.ismaildev.uz'],
+      proxy: {
+        '/v1': {
+          target: env.VITE_BACKEND_URL || env.VITE_API_URL?.replace('/v1', '') || 'http://localhost:5000',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
 
   };
