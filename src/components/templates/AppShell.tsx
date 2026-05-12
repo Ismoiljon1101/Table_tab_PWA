@@ -110,7 +110,7 @@ export function AppShell() {
         <div className="flex flex-col h-[100dvh] max-w-[480px] mx-auto bg-orange-50 relative overflow-hidden">
             {/* Header - Fixed 8% of Viewport Height (Hidden on Management) */}
             {!isManagementPage && !isNotificationsPage && (
-                <header className="h-14 flex items-center px-4 bg-white/80 backdrop-blur-md border-b border-stone-100 gap-1.5 z-50 transition-all duration-300">
+                <header style={{ paddingTop: 'env(safe-area-inset-top)' }} className="flex items-center px-4 min-h-14 bg-white/80 backdrop-blur-md border-b border-stone-100 gap-1.5 z-50 transition-all duration-300">
                     {search.isSearchVisible ? (
                         <div className="flex-1 flex items-center bg-stone-50 rounded-xl px-3 animate-fade-in group focus-within:bg-white focus-within:ring-1 focus-within:ring-amber-200 transition-all">
                             <Search size={16} className="text-stone-400 group-focus-within:text-amber-600 transition-colors" />
