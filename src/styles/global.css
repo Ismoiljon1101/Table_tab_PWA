@@ -32,14 +32,23 @@
 }
 
 @layer base {
+    html, body, #root {
+        height: 100dvh;
+        width: 100vw;
+        overflow: hidden;
+        margin: 0;
+        padding: 0;
+        position: fixed; /* Stops elastic bounce on iOS */
+    }
+
     body {
         background-color: var(--color-orange-50);
         color: var(--color-stone-900);
         -webkit-tap-highlight-color: transparent;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
-        min-height: 100dvh;
-        overflow-x: hidden;
+        user-select: none; /* Prevent text selection during drag/drop */
+        overscroll-behavior: none; /* Disable pull-to-refresh and bounce */
     }
 }
 

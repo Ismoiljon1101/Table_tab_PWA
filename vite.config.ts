@@ -57,8 +57,7 @@ export default defineConfig(({ mode }) => {
           ],
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false, // STOP THE CHAOS: Disable Service Worker in Dev mode
         },
       }),
     ],
@@ -69,7 +68,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts: ['ttb.ismaildev.uz', 'tabletap.ismaildev.uz'],
       proxy: {
         '/v1': {
-          target: env.VITE_BACKEND_URL || env.VITE_API_URL?.replace('/v1', '') || 'http://localhost:5000',
+          target: 'http://127.0.0.1:5000',
           changeOrigin: true,
           secure: false,
         },
@@ -82,7 +81,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts: ['ttb.ismaildev.uz', 'tabletap.ismaildev.uz'],
       proxy: {
         '/v1': {
-          target: env.VITE_BACKEND_URL || env.VITE_API_URL?.replace('/v1', '') || 'http://localhost:5000',
+          target: env.VITE_BACKEND_URL || env.VITE_API_URL?.replace('/v1', '') || 'http://127.0.0.1:5000',
           changeOrigin: true,
           secure: false,
         },

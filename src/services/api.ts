@@ -2,65 +2,40 @@ import axios from 'axios';
 
 /**
  * Axios instance pre-configured with the backend URL from env.
- * Automatically attaches JWT accessToken from memory.
+ * withCredentials: true ensures cookies (HttpOnly tokens) are sent automatically.
  */
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_URL || '/v1',
     headers: { 'Content-Type': 'application/json' },
+    withCredentials: true,
     timeout: 15000,
 });
 
-/** In-memory cache + localStorage persistence */
-let accessToken: string | null = localStorage.getItem('tabletap_access_token');
-let refreshToken: string | null = localStorage.getItem('tabletap_refresh_token');
+console.log('📡 [API] Base URL configured as:', api.defaults.baseURL);
 
-/** Set tokens after login/register */
-export function setTokens(access: string, refresh: string): void {
-    accessToken = access;
-    refreshToken = refresh;
-    localStorage.setItem('tabletap_access_token', access);
-    localStorage.setItem('tabletap_refresh_token', refresh);
-}
-
-/** Clear tokens on logout */
-export function clearTokens(): void {
-    accessToken = null;
-    refreshToken = null;
-    localStorage.removeItem('tabletap_access_token');
-    localStorage.removeItem('tabletap_refresh_token');
-}
-
-/** Get current access token */
-export function getAccessToken(): string | null {
-    return accessToken;
-}
-
-/** Request interceptor: attach Bearer token and log */
+/** Request interceptor: log requests */
 api.interceptors.request.use((config) => {
-    if (accessToken) {
-        config.headers.Authorization = `Bearer ${accessToken}`;
-    }
-    console.log(`🚀 [API Request] ${config.method?.toUpperCase()} ${config.url}`, config.params || '');
+    console.log(`🚀 [API Request] ${config.method?.toUpperCase()} ${config.url}`);
     return config;
 });
 
-/** Handle concurrent refresh attempts */
+/** Handle concurrent refresh attempts (still needed if multiple requests fail at once) */
 let isRefreshing = false;
 let failedQueue: any[] = [];
 
-const processQueue = (error: any, token: string | null = null) => {
+const processQueue = (error: any) => {
     failedQueue.forEach((prom) => {
         if (error) {
             prom.reject(error);
         } else {
-            prom.resolve(token);
+            prom.resolve();
         }
     });
 
     failedQueue = [];
 };
 
-/** Response interceptor: log and handle 401 → attempt refresh */
+/** Response interceptor: log and handle 401 → attempt refresh (via cookies) */
 api.interceptors.response.use(
     (response) => {
         console.log(`✅ [API Response] ${response.status} ${response.config.url}`, response.data);
@@ -69,15 +44,19 @@ api.interceptors.response.use(
     async (error) => {
         const { config, response } = error;
         const originalRequest = config;
-        const isRefreshRequest = originalRequest.url?.includes('auth/refresh');
 
-        if (response?.status === 401 && refreshToken && !originalRequest._retry && !isRefreshRequest) {
+        // Prevent recursion: Don't retry if the request itself is an auth endpoint
+        const isAuthRequest = 
+            originalRequest.url?.includes('auth/me') || 
+            originalRequest.url?.includes('auth/refresh') || 
+            originalRequest.url?.includes('auth/login');
+
+        if (response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
             if (isRefreshing) {
                 return new Promise((resolve, reject) => {
                     failedQueue.push({ resolve, reject });
                 })
-                    .then((token) => {
-                        originalRequest.headers.Authorization = `Bearer ${token}`;
+                    .then(() => {
                         return api(originalRequest);
                     })
                     .catch((err) => {
@@ -89,30 +68,30 @@ api.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const res = await axios.post(
+                console.log('🔄 Session expired, attempting headless refresh...');
+                // Just calling the endpoint is enough; browser attaches refreshToken cookie
+                await axios.post(
                     `${api.defaults.baseURL}/auth/refresh`,
                     {},
-                    { headers: { Authorization: `Bearer ${refreshToken}` } },
+                    { withCredentials: true },
                 );
 
-                const { accessToken: newAccess, refreshToken: newRefresh } = res.data;
-                setTokens(newAccess, newRefresh);
-
-                processQueue(null, newAccess);
-                originalRequest.headers.Authorization = `Bearer ${newAccess}`;
+                console.log('✅ Refresh successful, retrying original request.');
+                processQueue(null);
                 return api(originalRequest);
             } catch (refreshError) {
-                processQueue(refreshError, null);
-                console.warn('⚠️ Refresh token failed or expired. Force-logging out.');
-                clearTokens();
-                window.location.href = '/login';
+                processQueue(refreshError);
+                console.warn('⚠️ Session expired completely. Manual login required.');
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
             }
         }
 
-        console.error(`❌ [API Error] ${response?.status || 'Network Error'} ${config?.url}`, response?.data);
+        if (response?.status === 401 && isAuthRequest) {
+            console.warn(`🛑 Auth request failed: ${originalRequest.url}. Stopping retry loop.`);
+        }
+
         return Promise.reject(error);
     },
 );

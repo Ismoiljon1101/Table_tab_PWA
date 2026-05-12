@@ -33,15 +33,21 @@ function GuestRoute({ children }: { children: React.ReactNode }) {
  * Root application component with routing.
  */
 export default function App() {
-  const { user, refreshSession } = useAuthStore();
+  const { user, checkAuth, isAppReady } = useAuthStore();
 
   useEffect(() => {
-    if (user) {
-      console.log('🔄 Initial mount: Silently refreshing 7-day session');
-      refreshSession();
-    }
-    // Only run once on mount to avoid interrupting fresh logins
-  }, []);
+    // Initial initialization: verify session before showing any routes
+    checkAuth();
+  }, [checkAuth]);
+
+  if (!isAppReady) {
+    return (
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-stone-50 gap-4">
+        <div className="w-10 h-10 border-4 border-stone-200 border-t-amber-600 rounded-full animate-spin" />
+        <p className="text-stone-500 font-medium animate-pulse">Initializing TableTap...</p>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>

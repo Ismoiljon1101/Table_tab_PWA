@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { User, Restaurant } from '../types';
-import api, { setTokens, clearTokens } from '../services/api';
+import api from '../services/api';
 import { connectSocket, joinRestaurant, disconnectSocket } from '../services/socket';
 
 interface AuthState {
@@ -9,7 +9,9 @@ interface AuthState {
     user: User | null;
     /** The restaurant the user belongs to */
     restaurant: Restaurant | null;
-    /** Whether auth state is being loaded (e.g. refresh on mount) */
+    /** Whether the initial background auth check has completed */
+    isAppReady: boolean;
+    /** Whether an active auth request (login/register) is in progress */
     isLoading: boolean;
     /** Auth error message */
     error: string | null;
@@ -23,8 +25,10 @@ interface AuthState {
     /** Register as waiter joining existing restaurant */
     registerWaiter: (email: string, password: string, nickname: string, restaurantId: string) => Promise<void>;
     /** Logout and clear state */
-    logout: () => void;
-    /** Refresh current session to extend validity (sliding window) */
+    logout: () => Promise<void>;
+    /** Headless silent refresh on app mount */
+    checkAuth: () => Promise<void>;
+    /** Refresh current session (rolling cookie) */
     refreshSession: () => Promise<void>;
     /** Clear error message */
     clearError: () => void;
@@ -37,7 +41,8 @@ export const useAuthStore = create<AuthState>()(
         (set) => ({
             user: null,
             restaurant: null,
-            isLoading: false,
+            isAppReady: false, // Controls the splash screen
+            isLoading: false,  // Controls the login button spinners
             error: null,
             currentFloorName: null,
 
@@ -45,7 +50,6 @@ export const useAuthStore = create<AuthState>()(
                 set({ isLoading: true, error: null });
                 try {
                     const { data } = await api.post('/auth/login', { email, password });
-                    setTokens(data.accessToken, data.refreshToken);
                     set({ user: data.user, restaurant: data.restaurant, isLoading: false });
 
                     const sock = connectSocket();
@@ -68,7 +72,6 @@ export const useAuthStore = create<AuthState>()(
                         restaurantName,
                         role: 'owner',
                     });
-                    setTokens(data.accessToken, data.refreshToken);
                     set({ user: data.user, restaurant: data.restaurant, isLoading: false });
 
                     const sock = connectSocket();
@@ -91,7 +94,6 @@ export const useAuthStore = create<AuthState>()(
                         restaurantId,
                         role: 'waiter',
                     });
-                    setTokens(data.accessToken, data.refreshToken);
                     set({ user: data.user, restaurant: data.restaurant, isLoading: false });
 
                     const sock = connectSocket();
@@ -104,21 +106,54 @@ export const useAuthStore = create<AuthState>()(
                 }
             },
 
-            logout: () => {
-                clearTokens();
+            logout: async () => {
+                try { await api.post('/auth/logout'); } catch { /* ignore */ }
                 disconnectSocket();
                 set({ user: null, restaurant: null, error: null });
             },
 
+            checkAuth: async () => {
+                // We don't set isAppReady: false here, it starts false.
+                try {
+                    console.log('🔍 [Auth] Verifying session...');
+                    const { data: user } = await api.get('/auth/me');
+                    
+                    if (!user) throw new Error('No user data');
+
+                    // Safety: Only fetch restaurant if user exists
+                    const { data: restaurant } = await api.get('/restaurants/me');
+                    
+                    set({ 
+                        user, 
+                        restaurant, 
+                        isAppReady: true 
+                    });
+
+                    // Auto-connect socket
+                    try {
+                        const sock = connectSocket();
+                        sock.on('connect', () => joinRestaurant(restaurant._id));
+                        if (sock.connected) joinRestaurant(restaurant._id);
+                    } catch (sockErr) {
+                        console.warn('⚠️ Socket connection failed during init', sockErr);
+                    }
+                    
+                    console.log('✅ [Auth] Session verified');
+                } catch (err) {
+                    console.warn('❌ [Auth] Session verification failed');
+                    disconnectSocket();
+                    // CRITICAL: Clear state to stop the loop and wipe stale ghost data
+                    localStorage.removeItem('tabletap_auth_storage');
+                    set({ user: null, restaurant: null, isAppReady: true });
+                }
+            },
+
             refreshSession: async () => {
                 try {
-                    const { data } = await api.post('/auth/refresh');
-                    // Only update tokens — do NOT overwrite user/restaurant
-                    // because the refresh endpoint only returns new tokens, not user data.
-                    // Overwriting with undefined would clear auth state and cause redirect loops.
-                    setTokens(data.accessToken, data.refreshToken);
+                    // Simple "touch" to extend the cookie
+                    await api.post('/auth/refresh');
                 } catch (err) {
-                    console.warn('Session refresh failed silently, user will need to re-login when tokens fully expire');
+                    console.warn('Session refresh failed');
                 }
             },
 
