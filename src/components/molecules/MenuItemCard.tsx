@@ -24,12 +24,12 @@ export function MenuItemCard({ item, onAdd, onClick, index = 0 }: MenuItemCardPr
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ 
-                duration: 0.4, 
-                delay: index * 0.05,
+                duration: 0.3, 
+                delay: Math.min(index, 8) * 0.04,
                 ease: [0.16, 1, 0.3, 1] 
             }}
             whileTap={{ scale: 0.98 }}
-            className="group flex items-center gap-2 p-2.5 bg-white/70 backdrop-blur-md rounded-2xl border border-white/20 shadow-sm shadow-stone-200/50 cursor-pointer transition-all hover:bg-white hover:border-amber-200/50 active:shadow-inner"
+            className="group flex items-center gap-2 p-2.5 bg-white/70 backdrop-blur-md rounded-2xl border border-white/20 shadow-sm shadow-stone-200/50 cursor-pointer transition-all active:bg-white active:border-amber-200/50 active:shadow-inner"
             onClick={onClick}
         >
             <div className="flex-1 flex flex-col gap-0.5 min-w-0">

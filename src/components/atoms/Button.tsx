@@ -24,16 +24,16 @@ export function Button({
     const baseStyles = 'inline-flex items-center justify-center font-medium rounded-xl transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 disabled:opacity-50 disabled:cursor-not-allowed';
 
     const variants = {
-        primary: 'bg-amber-600 text-white hover:bg-amber-700 shadow-sm hover:shadow-md active:scale-95',
-        secondary: 'bg-stone-100 text-stone-700 hover:bg-stone-200 active:scale-95',
-        ghost: 'bg-transparent text-stone-600 hover:bg-stone-100 hover:text-stone-900',
-        danger: 'bg-red-50 text-red-600 hover:bg-red-100 active:scale-95'
+        primary: 'bg-amber-600 text-white hover:bg-amber-700 active:bg-amber-700 shadow-sm active:scale-95',
+        secondary: 'bg-stone-100 text-stone-700 hover:bg-stone-200 active:bg-stone-200 active:scale-95',
+        ghost: 'bg-transparent text-stone-600 hover:bg-stone-100 hover:text-stone-900 active:bg-stone-100 active:text-stone-900',
+        danger: 'bg-red-50 text-red-600 hover:bg-red-100 active:bg-red-100 active:scale-95'
     };
 
     const sizes = {
-        sm: 'px-3 py-1.5 text-sm',
-        md: 'px-4 py-2 text-sm',
-        lg: 'px-6 py-3 text-base'
+        sm: 'px-3 py-2 text-sm min-h-[44px]',
+        md: 'px-4 py-2.5 text-sm min-h-[44px]',
+        lg: 'px-6 py-3.5 text-base min-h-[52px]'
     };
 
     const classes = [

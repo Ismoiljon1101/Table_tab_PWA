@@ -34,8 +34,8 @@ export function SettingItem({
         <div
             onClick={onClick}
             className={`
-                flex items-center gap-3 p-3.5 transition-all duration-200
-                ${isClickable ? 'active:bg-stone-100 cursor-pointer' : ''}
+                flex items-center gap-3 px-4 py-3.5 min-h-[52px] transition-all duration-150
+                ${isClickable ? 'active:bg-stone-100 active:scale-[0.98] cursor-pointer' : ''}
                 ${className}
             `}
         >

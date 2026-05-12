@@ -12,7 +12,7 @@ interface AuthTemplateProps {
  */
 export function AuthTemplate({ header, modeSelector, children }: AuthTemplateProps) {
     return (
-        <div className="flex flex-col justify-center min-h-[100dvh] max-w-[400px] mx-auto p-6 py-12">
+        <div className="flex flex-col min-h-[100dvh] max-w-[400px] mx-auto p-6 pt-16 pb-10 overflow-y-auto">
             {header}
             {modeSelector}
             <div className="mt-8 animate-slide-up">

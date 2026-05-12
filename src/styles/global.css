@@ -50,6 +50,17 @@
         user-select: none; /* Prevent text selection during drag/drop */
         overscroll-behavior: none; /* Disable pull-to-refresh and bounce */
     }
+
+    /* Allow text selection and editing in form fields */
+    input, textarea, select {
+        user-select: text;
+        -webkit-user-select: text;
+    }
+
+    /* Eliminate 300ms tap delay on all interactive elements */
+    button, a, [role="button"] {
+        touch-action: manipulation;
+    }
 }
 
 @layer utilities {

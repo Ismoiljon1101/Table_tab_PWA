@@ -20,7 +20,7 @@ export function Input({ label, error, id, className = '', ...props }: InputProps
             </label>
             <input
                 id={inputId}
-                className={`w-full px-4 py-2.5 bg-stone-50 border rounded-xl text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-shadow ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-stone-200 focus:border-amber-500'
+                className={`w-full px-4 py-3 min-h-[44px] bg-stone-50 border rounded-xl text-base text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-shadow select-text ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-200' : 'border-stone-200 focus:border-amber-500'
                     }`}
                 {...props}
             />
