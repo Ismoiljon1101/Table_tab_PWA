@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { useSearchStore } from '../../stores/searchStore';
 import { ShoppingCart } from 'lucide-react';
 import { MenuTemplate } from '../../components/templates/MenuTemplate';
@@ -7,6 +8,7 @@ import { MenuCategoryTabs } from '../../components/organisms/MenuCategoryTabs';
 import { MenuItemCard } from '../../components/molecules/MenuItemCard';
 import { ModifierModal } from '../../components/organisms/ModifierModal';
 import { useCartStore } from '../../stores/cartStore';
+import { useAuthStore } from '../../stores/authStore';
 import api from '../../services/api';
 import type { MenuItem, Category } from '../../types';
 import { MenuSkeleton } from '../../components/atoms/MenuSkeleton';
@@ -15,42 +17,45 @@ import { MenuSkeleton } from '../../components/atoms/MenuSkeleton';
  * MenuPage
  * Refactored to use Atomic Design (Templates, Organisms, Molecules).
  * Enhanced with Cinematic Motion and Staggered entry.
+ * Data fetching via React Query — cached for 5 min, instant on revisit.
  */
 export function MenuPage() {
     // --- STATE MANAGEMENT ---
-    const [items, setItems] = useState<MenuItem[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
     const [selectedCategoryId, setSelectedCategoryId] = useState('');
-    const [loading, setLoading] = useState(true);
     const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
 
     // --- SHARED STORES ---
     const cart = useCartStore();
     const search = useSearchStore();
+    const user = useAuthStore((s) => s.user);
 
-    useEffect(() => {
-        fetchData();
-    }, []);
+    // React Query: menu items — cached, no re-fetch on every navigation
+    const { data: items = [], isLoading: isLoadingItems } = useQuery({
+        queryKey: ['menu-items'],
+        queryFn: async () => {
+            const res = await api.get<MenuItem[]>('/menu');
+            return res.data;
+        },
+        staleTime: 1000 * 60 * 5, // 5 min cache
+        enabled: !!user,
+    });
 
-    const fetchData = async () => {
-        try {
-            setLoading(true);
-            const [itemRes, catRes] = await Promise.all([
-                api.get<MenuItem[]>('/menu'),
-                api.get<Category[]>('/categories'),
-            ]);
-            setItems(itemRes.data);
-            setCategories(catRes.data);
-            
-            if (catRes.data.length > 0 && !selectedCategoryId) {
-                setSelectedCategoryId(catRes.data[0]._id);
+    // React Query: categories — cached
+    const { data: categories = [], isLoading: isLoadingCategories } = useQuery({
+        queryKey: ['categories'],
+        queryFn: async () => {
+            const res = await api.get<Category[]>('/categories');
+            // Auto-select first category on first load
+            if (res.data.length > 0 && !selectedCategoryId) {
+                setSelectedCategoryId(res.data[0]._id);
             }
-        } catch (err) {
-            console.error('Failed to fetch menu data:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
+            return res.data;
+        },
+        staleTime: 1000 * 60 * 5,
+        enabled: !!user,
+    });
+
+    const isLoading = isLoadingItems || isLoadingCategories;
 
     const handleOpenCart = () => {
         window.dispatchEvent(new CustomEvent('open-cart'));
@@ -70,7 +75,7 @@ export function MenuPage() {
         return result;
     }, [items, selectedCategoryId, search.query]);
 
-    if (loading && items.length === 0) {
+    if (isLoading && items.length === 0) {
         return (
             <div className="flex flex-col p-4 gap-3 overflow-hidden">
                 {[...Array(8)].map((_, i) => <MenuSkeleton key={i} />)}

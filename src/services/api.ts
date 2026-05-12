@@ -44,7 +44,7 @@ api.interceptors.response.use(
         if (!isProd) {
             console.log(`✅ [API] ${response.status} ${response.config.url}`, response.data);
         } else {
-            console.log(`✅ [API] ${response.status} ${response.config.url.split('?')[0]}`);
+            console.log(`✅ [API] ${response.status} ${response.config.url?.split('?')[0]}`);
         }
         return response;
     },
