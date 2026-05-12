@@ -113,15 +113,19 @@ export const useAuthStore = create<AuthState>()(
             },
 
             checkAuth: async () => {
-                // We don't set isAppReady: false here, it starts false.
                 try {
                     console.log('🔍 [Auth] Verifying session...');
-                    const { data: user } = await api.get('/auth/me');
                     
-                    if (!user) throw new Error('No user data');
+                    // Parallelize requests to eliminate sequential latency
+                    const [userRes, restRes] = await Promise.all([
+                        api.get('/auth/me'),
+                        api.get('/restaurants/me')
+                    ]);
+                    
+                    const user = userRes.data;
+                    const restaurant = restRes.data;
 
-                    // Safety: Only fetch restaurant if user exists
-                    const { data: restaurant } = await api.get('/restaurants/me');
+                    if (!user) throw new Error('No user data');
                     
                     set({ 
                         user, 
@@ -129,20 +133,21 @@ export const useAuthStore = create<AuthState>()(
                         isAppReady: true 
                     });
 
-                    // Auto-connect socket
-                    try {
-                        const sock = connectSocket();
-                        sock.on('connect', () => joinRestaurant(restaurant._id));
-                        if (sock.connected) joinRestaurant(restaurant._id);
-                    } catch (sockErr) {
-                        console.warn('⚠️ Socket connection failed during init', sockErr);
-                    }
+                    // Auto-connect socket without blocking the UI thread
+                    setTimeout(() => {
+                        try {
+                            const sock = connectSocket();
+                            sock.on('connect', () => joinRestaurant(restaurant._id));
+                            if (sock.connected) joinRestaurant(restaurant._id);
+                        } catch (sockErr) {
+                            console.warn('⚠️ Socket connection failed during init', sockErr);
+                        }
+                    }, 0);
                     
                     console.log('✅ [Auth] Session verified');
                 } catch (err) {
                     console.warn('❌ [Auth] Session verification failed');
                     disconnectSocket();
-                    // CRITICAL: Clear state to stop the loop and wipe stale ghost data
                     localStorage.removeItem('tabletap_auth_storage');
                     set({ user: null, restaurant: null, isAppReady: true });
                 }

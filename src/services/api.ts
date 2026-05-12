@@ -15,7 +15,9 @@ console.log('📡 [API] Base URL configured as:', api.defaults.baseURL);
 
 /** Request interceptor: log requests */
 api.interceptors.request.use((config) => {
-    console.log(`🚀 [API Request] ${config.method?.toUpperCase()} ${config.url}`);
+    if (!import.meta.env.PROD) {
+        console.log(`🚀 [API] ${config.method?.toUpperCase()} ${config.url}`);
+    }
     return config;
 });
 
@@ -38,7 +40,12 @@ const processQueue = (error: any) => {
 /** Response interceptor: log and handle 401 → attempt refresh (via cookies) */
 api.interceptors.response.use(
     (response) => {
-        console.log(`✅ [API Response] ${response.status} ${response.config.url}`, response.data);
+        const isProd = import.meta.env.PROD;
+        if (!isProd) {
+            console.log(`✅ [API] ${response.status} ${response.config.url}`, response.data);
+        } else {
+            console.log(`✅ [API] ${response.status} ${response.config.url.split('?')[0]}`);
+        }
         return response;
     },
     async (error) => {
