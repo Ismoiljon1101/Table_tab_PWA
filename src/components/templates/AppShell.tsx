@@ -3,7 +3,8 @@ import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { LayoutGrid, UtensilsCrossed, ShoppingCart, ClipboardList, Settings, Bell, Search, X } from 'lucide-react';
 import { CartBottomSheet } from '../organisms/CartBottomSheet';
-import { Toast } from '../atoms/Toast';
+import { ToastContainer } from '../atoms/ToastContainer';
+import { useToast } from '../../stores/toastStore';
 import api from '../../services/api';
 import type { Table } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
@@ -24,12 +25,11 @@ export function AppShell() {
     const navigate = useNavigate();
 
     const queryClient = useQueryClient();
+    const toast = useToast();
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [isPlacingOrder, setIsPlacingOrder] = useState(false);
-    const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
     const cart = useCartStore();
-    const dismissToast = useCallback(() => setToast(null), []);
 
     useEffect(() => {
         const handleOpenCart = () => setIsCartOpen(true);
@@ -92,7 +92,7 @@ export function AppShell() {
 
             // SUCCESS: Update React Query cache in background, no page reload
             queryClient.invalidateQueries({ queryKey: ['tables'] });
-            setToast({ message: 'Order placed! ✓', type: 'success' });
+            toast.success('Order placed! ✓');
 
             // Navigate via React Router — keeps app alive, preserves all cache
             navigate('/');
@@ -100,7 +100,7 @@ export function AppShell() {
             console.error('Failed to save order:', err);
             const raw = err?.response?.data?.message;
             const message = Array.isArray(raw) ? raw[0] : (raw || 'Failed to place order. Try again.');
-            setToast({ message, type: 'error' });
+            toast.error(message);
         } finally {
             setIsPlacingOrder(false);
         }
@@ -222,13 +222,7 @@ export function AppShell() {
                 />
             )}
 
-            {toast && (
-                <Toast
-                    message={toast.message}
-                    type={toast.type}
-                    onDismiss={dismissToast}
-                />
-            )}
+            <ToastContainer />
         </div>
     );
 }

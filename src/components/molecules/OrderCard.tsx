@@ -1,9 +1,12 @@
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Printer, Edit2, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../atoms/Button';
 import { useCartStore } from '../../stores/cartStore';
 import { useOrdersStore } from '../../stores/ordersStore';
+import { useToast } from '../../stores/toastStore';
+import { ConfirmationModal } from './ConfirmationModal';
 import { OrderStatus } from '../../types/enums';
 import { formatCurrency, formatClockTime } from '../../utils/format';
 import type { Order } from '../../types';
@@ -20,7 +23,9 @@ interface OrderCardProps {
 export function OrderCard({ order, tableName, indexLabel }: OrderCardProps) {
     const loadOrder = useCartStore((s) => s.loadOrder);
     const updateOrderStatus = useOrdersStore((s) => s.updateOrderStatus);
+    const toast = useToast();
     const navigate = useNavigate();
+    const [showVoidConfirm, setShowVoidConfirm] = useState(false);
 
     const waiterName = (order.waiterId as any)?.nickname || 'Staff';
 
@@ -30,24 +35,30 @@ export function OrderCard({ order, tableName, indexLabel }: OrderCardProps) {
     };
 
     const handlePrint = () => {
-        console.log('🖨️ Printing order:', order.orderNumber);
-        alert(`Printing Order #${order.orderNumber} for ${tableName}`);
+        toast.info(`Printing Order #${order.orderNumber} for ${tableName}...`);
     };
 
-    const handleCancel = () => {
-        const ok = window.confirm(
-            `⚠️ VOID ORDER #${order.orderNumber}?\n\nThis will cancel the entire order for ${tableName} and notify the kitchen.`
-        );
-        if (ok) {
-            updateOrderStatus(order._id, OrderStatus.CANCELLED);
+    const handleVoidConfirmed = async () => {
+        setShowVoidConfirm(false);
+        try {
+            await updateOrderStatus(order._id, OrderStatus.CANCELLED);
+            toast.success(`Order #${order.orderNumber} voided`);
+        } catch {
+            toast.error('Failed to void order. Try again.');
         }
     };
 
-    const handleUndo = () => {
-        updateOrderStatus(order._id, OrderStatus.PENDING);
+    const handleUndo = async () => {
+        try {
+            await updateOrderStatus(order._id, OrderStatus.PENDING);
+            toast.success(`Order #${order.orderNumber} restored`);
+        } catch {
+            toast.error('Failed to restore order. Try again.');
+        }
     };
 
     return (
+        <>
         <div
             className={`flex flex-col p-4 bg-white/70 backdrop-blur-md rounded-[28px] border border-white/20 shadow-xl shadow-stone-900/5 h-full overflow-hidden transition-all ${
                 order.status === OrderStatus.SERVED || order.status === OrderStatus.CANCELLED ? 'opacity-60 grayscale-[0.2]' : ''
@@ -155,7 +166,7 @@ export function OrderCard({ order, tableName, indexLabel }: OrderCardProps) {
                     ) : (
                         <motion.button
                             whileTap={{ scale: 0.95 }}
-                            onClick={handleCancel}
+                            onClick={() => setShowVoidConfirm(true)}
                             className="h-8 px-3 rounded-lg bg-red-50 text-red-500 border border-red-100 text-[10px] font-black uppercase tracking-widest active:bg-red-100 transition-all"
                         >
                             Void
@@ -164,5 +175,17 @@ export function OrderCard({ order, tableName, indexLabel }: OrderCardProps) {
                 </div>
             </div>
         </div>
+
+        {showVoidConfirm && (
+            <ConfirmationModal
+                title={`Void Order #${order.orderNumber}?`}
+                message={`This will cancel the entire order for ${tableName}. The kitchen will be notified. This cannot be undone.`}
+                confirmLabel="Yes, Void"
+                cancelLabel="Keep Order"
+                onConfirm={handleVoidConfirmed}
+                onCancel={() => setShowVoidConfirm(false)}
+            />
+        )}
+        </>
     );
 }

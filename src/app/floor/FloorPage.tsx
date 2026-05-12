@@ -8,6 +8,7 @@ import { TableActionSheet } from '../../components/organisms/TableActionSheet';
 import { ConfirmationModal } from '../../components/molecules/ConfirmationModal';
 import { useAuthStore } from '../../stores/authStore';
 import { useCartStore } from '../../stores/cartStore';
+import { useToast } from '../../stores/toastStore';
 import { UserRole } from '../../types/enums';
 import api from '../../services/api';
 import { getSocket } from '../../services/socket';
@@ -17,6 +18,7 @@ import type { Table, Section } from '../../types';
 export function FloorPage() {
     const queryClient = useQueryClient();
     const navigate = useNavigate();
+    const toast = useToast();
     const user = useAuthStore((s) => s.user);
     const currentFloorName = useAuthStore((s) => s.currentFloorName);
     const setCurrentFloorName = useAuthStore((s) => s.setCurrentFloorName);
@@ -25,6 +27,7 @@ export function FloorPage() {
     const [selectedSectionId, setSelectedSectionId] = useState<string | null>(null);
     const [actionTable, setActionTable] = useState<Table | null>(null);
     const [pendingTable, setPendingTable] = useState<Table | null>(null);
+    const [cancelConfirmTable, setCancelConfirmTable] = useState<Table | null>(null);
     const [isActionLoading, setIsActionLoading] = useState(false);
 
     const isAdmin = user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN;
@@ -146,32 +149,43 @@ export function FloorPage() {
             } else {
                 await api.patch(`/tables/${actionTable._id}`, { status: 'available', currentOrderId: null });
             }
-            // Invalidate to trigger a clean re-fetch from source of truth
             queryClient.invalidateQueries({ queryKey: ['tables'] });
             cart.clearCart();
             cart.setTable(actionTable._id);
+            toast.success('Table cleared for new customer');
             navigate('/menu');
             setActionTable(null);
         } catch (err) {
             console.error('Failed to complete order:', err);
+            toast.error('Failed to clear table. Try again.');
         } finally {
             setIsActionLoading(false);
         }
     };
 
-    const handleCancelOrder = async () => {
+    /** Called when user taps "Cancel Order" — shows confirmation modal first */
+    const handleCancelOrderRequest = () => {
         if (!actionTable) return;
+        setCancelConfirmTable(actionTable);
+        setActionTable(null);
+    };
+
+    /** Executes cancel after user confirms */
+    const handleCancelOrderConfirmed = async () => {
+        if (!cancelConfirmTable) return;
         setIsActionLoading(true);
+        setCancelConfirmTable(null);
         try {
-            if (actionTable.currentOrderId) {
-                await api.patch(`/orders/${actionTable.currentOrderId}/status`, { status: 'cancelled' });
+            if (cancelConfirmTable.currentOrderId) {
+                await api.patch(`/orders/${cancelConfirmTable.currentOrderId}/status`, { status: 'cancelled' });
             } else {
-                await api.patch(`/tables/${actionTable._id}`, { status: 'available', currentOrderId: null });
+                await api.patch(`/tables/${cancelConfirmTable._id}`, { status: 'available', currentOrderId: null });
             }
             queryClient.invalidateQueries({ queryKey: ['tables'] });
-            setActionTable(null);
+            toast.success('Order cancelled');
         } catch (err) {
             console.error('Failed to cancel order:', err);
+            toast.error('Failed to cancel order. Try again.');
         } finally {
             setIsActionLoading(false);
         }
@@ -250,7 +264,7 @@ export function FloorPage() {
                     onClose={() => setActionTable(null)}
                     onAddMenu={handleAddMenu}
                     onNewCustomer={handleNewCustomer}
-                    onCancelOrder={handleCancelOrder}
+                onCancelOrder={handleCancelOrderRequest}
                     isLoading={isActionLoading}
                 />
             )}
@@ -283,6 +297,16 @@ export function FloorPage() {
                     />
                 );
             })()}
+            {cancelConfirmTable && (
+                <ConfirmationModal
+                    title="Cancel Order?"
+                    message={`Are you sure you want to cancel the order for ${cancelConfirmTable.displayName || cancelConfirmTable.name}? This cannot be undone.`}
+                    confirmLabel="Yes, Cancel"
+                    cancelLabel="Keep Order"
+                    onConfirm={handleCancelOrderConfirmed}
+                    onCancel={() => setCancelConfirmTable(null)}
+                />
+            )}
         </FloorTemplate>
     );
 }
