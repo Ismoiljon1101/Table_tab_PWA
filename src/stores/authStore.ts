@@ -145,11 +145,17 @@ export const useAuthStore = create<AuthState>()(
                     }, 0);
                     
                     console.log('✅ [Auth] Session verified');
-                } catch (err) {
-                    console.warn('❌ [Auth] Session verification failed');
-                    disconnectSocket();
-                    localStorage.removeItem('tabletap_auth_storage');
-                    set({ user: null, restaurant: null, isAppReady: true });
+                } catch (err: any) {
+                    const isUnauthorized = err?.response?.status === 401;
+                    console.warn(`❌ [Auth] Session verification failed: ${isUnauthorized ? 'Unauthorized' : 'Network/Server Error'}`);
+                    
+                    if (isUnauthorized) {
+                        disconnectSocket();
+                        localStorage.removeItem('tabletap_auth_storage');
+                        set({ user: null, restaurant: null });
+                    }
+                    
+                    set({ isAppReady: true });
                 }
             },
 
