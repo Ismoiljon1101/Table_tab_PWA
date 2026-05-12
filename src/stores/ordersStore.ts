@@ -82,6 +82,7 @@ export const useOrdersStore = create<OrdersState>((set, get) => ({
             get().upsertOrder(data);
         } catch (err) {
             console.error('Failed to update order status:', err);
+            throw err; // Rethrow so callers can show toast feedback
         }
     },
 }));
