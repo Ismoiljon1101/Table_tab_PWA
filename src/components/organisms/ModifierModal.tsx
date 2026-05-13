@@ -145,9 +145,10 @@ export function ModifierModal({ item, onClose }: ModifierModalProps) {
                             size="lg" 
                             fullWidth 
                             onClick={handleAdd}
+                            disabled={!item.isAvailable}
                             className="h-16 rounded-2xl text-[15px] font-black uppercase tracking-widest shadow-xl shadow-amber-600/30 active:scale-[0.97] transition-all"
                         >
-                            Confirm • {formatCurrency(totalPrice)}
+                            {item.isAvailable ? `Confirm • ${formatCurrency(totalPrice)}` : "Out of stock"}
                         </Button>
                     </div>
                 </motion.div>
