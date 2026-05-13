@@ -46,6 +46,8 @@ export function ModifierModal({ item, onClose }: ModifierModalProps) {
 
     const totalPrice = item.price + selectedModifiers.reduce((acc, curr) => acc + curr.price, 0);
 
+    const isAvailable = item.isAvailable !== false;
+
     return (
         <AnimatePresence>
             <div className="fixed inset-0 z-[300] flex items-end justify-center">
@@ -145,10 +147,10 @@ export function ModifierModal({ item, onClose }: ModifierModalProps) {
                             size="lg" 
                             fullWidth 
                             onClick={handleAdd}
-                            disabled={!item.isAvailable}
+                            disabled={!isAvailable}
                             className="h-16 rounded-2xl text-[15px] font-black uppercase tracking-widest shadow-xl shadow-amber-600/30 active:scale-[0.97] transition-all"
                         >
-                            {item.isAvailable ? `Confirm • ${formatCurrency(totalPrice)}` : "Out of stock"}
+                            {isAvailable ? `Confirm • ${formatCurrency(totalPrice)}` : "Out of stock"}
                         </Button>
                     </div>
                 </motion.div>
