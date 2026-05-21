@@ -11,23 +11,8 @@ import { Button } from '../../components/atoms/Button';
 export function NotificationsPage() {
     const navigate = useNavigate();
 
-    // Placeholder notifications state
-    const [notifications, setNotifications] = React.useState([
-        {
-            id: '1',
-            title: 'Welcome to TableTap!',
-            message: 'Start by setting up your floor plan in the management section.',
-            time: '2 hours ago',
-            read: false,
-        },
-        {
-            id: '2',
-            title: 'System Update',
-            message: 'Menu categories now support custom codes for better organization.',
-            time: '5 hours ago',
-            read: true,
-        }
-    ]);
+    // Placeholder notifications state — empty as real-time is in development
+    const [notifications, setNotifications] = React.useState([]);
 
     const header = (
         <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100">
@@ -45,70 +30,36 @@ export function NotificationsPage() {
                     </span>
                 </div>
             </div>
-            
-            <button 
-                className="p-2 text-stone-400 active:text-red-500 transition-colors"
-                onClick={() => setNotifications([])}
-                title="Clear All"
-            >
-                <Trash2 size={18} />
-            </button>
         </div>
     );
 
     return (
         <StandardPageTemplate header={header}>
-            <div className="flex flex-col gap-3 py-4">
-                <div className="px-1 mb-2">
-                    <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Real-time alerts coming soon</p>
-                </div>
-                
-                {notifications.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                        <div className="w-16 h-16 bg-stone-50 rounded-full flex items-center justify-center mb-4">
-                            <Bell size={32} className="text-stone-200" />
-                        </div>
-                        <h3 className="text-stone-900 font-bold mb-1">No notifications yet</h3>
-                        <p className="text-stone-500 text-sm max-w-[240px]">
-                            We'll let you know when there's something important for you.
-                        </p>
+            <div className="flex flex-col gap-4 py-8 px-2">
+                <div className="flex flex-col items-center justify-center py-16 px-6 text-center bg-white border border-stone-200/60 rounded-[32px] shadow-sm">
+                    <div className="w-16 h-16 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mb-5 animate-[pulse_2s_infinite]">
+                        <Bell size={32} />
                     </div>
-                ) : (
-                    notifications.map((notif) => (
-                        <div 
-                            key={notif.id}
-                            className={`p-4 rounded-2xl border transition-all ${
-                                notif.read 
-                                ? 'bg-white border-stone-100 opacity-70' 
-                                : 'bg-white border-amber-100 shadow-sm'
-                            }`}
-                        >
-                            <div className="flex justify-between items-start mb-1">
-                                <h4 className="font-bold text-stone-900 text-sm">
-                                    {notif.title}
-                                </h4>
-                                <span className="text-[10px] text-stone-400 font-medium">
-                                    {notif.time}
-                                </span>
-                            </div>
-                            <p className="text-xs text-stone-600 leading-relaxed">
-                                {notif.message}
-                            </p>
-                        </div>
-                    ))
-                )}
+                    <h3 className="text-stone-900 font-black text-lg mb-2 uppercase tracking-tighter">
+                        Real-time alerts coming soon
+                    </h3>
+                    <p className="text-stone-500 text-xs max-w-[240px] leading-relaxed mb-6 font-medium">
+                        We're currently building our instant notification system to sync order updates, kitchen calls, and table alerts directly to your device.
+                    </p>
+                    <div className="px-3 py-1 bg-amber-50 rounded-full text-[9px] font-black text-amber-700 uppercase tracking-widest border border-amber-100 animate-pulse">
+                        In Development
+                    </div>
+                </div>
 
-                {notifications.length > 0 && (
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        fullWidth 
-                        className="mt-4 text-stone-400"
-                        onClick={() => navigate('/')}
-                    >
-                        Back to Home
-                    </Button>
-                )}
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    fullWidth 
+                    className="text-stone-400 font-bold uppercase tracking-wider text-[11px]"
+                    onClick={() => navigate(-1)}
+                >
+                    Back to previous page
+                </Button>
             </div>
         </StandardPageTemplate>
     );

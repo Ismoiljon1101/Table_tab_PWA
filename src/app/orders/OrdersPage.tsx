@@ -26,10 +26,6 @@ export function OrdersPage() {
         return unsub;
     }, [fetchTodayOrders, subscribeToUpdates]);
 
-    useEffect(() => {
-        setCurrentIndex(0);
-    }, [activeTab, orders.length]);
-
     const activeOrders = orders.filter((o) => o.status !== OrderStatus.SERVED && o.status !== OrderStatus.CANCELLED);
     const finishedOrders = orders.filter((o) => o.status === OrderStatus.SERVED);
     const cancelledOrders = orders.filter((o) => o.status === OrderStatus.CANCELLED);
@@ -40,6 +36,7 @@ export function OrdersPage() {
         cancelledOrders;
 
     const total = displayOrders.length;
+    const safeIndex = total > 0 ? Math.max(0, Math.min(currentIndex, total - 1)) : 0;
 
     const getTableName = (order: Order): string => {
         if (typeof order.tableId === 'object' && order.tableId !== null) {
@@ -60,7 +57,7 @@ export function OrdersPage() {
         [total]
     );
 
-    const handlePercent = total <= 1 ? 0 : (currentIndex / (total - 1)) * 100;
+    const handlePercent = total <= 1 ? 0 : (safeIndex / (total - 1)) * 100;
 
     useEffect(() => {
         const onPointerMove = (e: PointerEvent) => {
@@ -128,7 +125,7 @@ export function OrdersPage() {
     ];
 
     return (
-        <div className="flex flex-col bg-[#fafafa]" style={{ height: 'calc(100dvh - 120px)' }}>
+        <div className="flex flex-col bg-[#fafafa] h-full overflow-hidden">
             {/* Tab Toggle with Sliding Indicator */}
             <div className="mx-4 mt-6 mb-4 p-1.5 bg-stone-200/50 backdrop-blur-md rounded-[24px] flex relative gap-1 border border-white/20">
                 {tabs.map((tab) => {
@@ -136,7 +133,10 @@ export function OrdersPage() {
                     return (
                         <motion.button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            onClick={() => {
+                                setActiveTab(tab.id as any);
+                                setCurrentIndex(0);
+                            }}
                             className={`flex-1 py-3.5 text-[11px] font-black uppercase tracking-[0.1em] rounded-[20px] transition-colors relative z-10 ${
                                 isActive ? 'text-stone-900' : 'text-stone-400'
                             }`}
@@ -179,15 +179,15 @@ export function OrdersPage() {
                         role="slider"
                         aria-valuemin={1}
                         aria-valuemax={total}
-                        aria-valuenow={currentIndex + 1}
+                        aria-valuenow={safeIndex + 1}
                         aria-label="Order navigation scrubber"
                     >
                         {/* Upper Control */}
                         <motion.button 
                             whileTap={{ scale: 0.7 }}
                             onClick={() => {
-                                if (currentIndex > 0) {
-                                    setCurrentIndex(prev => prev - 1);
+                                if (safeIndex > 0) {
+                                    setCurrentIndex(safeIndex - 1);
                                     window.navigator.vibrate?.(10);
                                 }
                             }}
@@ -203,7 +203,7 @@ export function OrdersPage() {
                                 const rect = e.currentTarget.getBoundingClientRect();
                                 const ratio = (e.clientY - rect.top) / rect.height;
                                 const newIdx = Math.round(ratio * (total - 1));
-                                if (newIdx !== currentIndex) {
+                                if (newIdx !== safeIndex) {
                                     setCurrentIndex(newIdx);
                                     window.navigator.vibrate?.(5);
                                 }
@@ -217,7 +217,7 @@ export function OrdersPage() {
                                 {[...Array(Math.max(1, Math.min(total, 50)))].map((_, i) => {
                                     const tickCount = Math.max(1, Math.min(total, 50));
                                     const tickProgress = tickCount <= 1 ? 0.5 : i / (tickCount - 1);
-                                    const handleProgress = total <= 1 ? 0.5 : currentIndex / (total - 1);
+                                    const handleProgress = total <= 1 ? 0.5 : safeIndex / (total - 1);
                                     const distance = Math.abs(tickProgress - handleProgress);
                                     
                                     const isMajor = i % 5 === 0;
@@ -269,8 +269,8 @@ export function OrdersPage() {
                         <motion.button 
                             whileTap={{ scale: 0.7 }}
                             onClick={() => {
-                                if (currentIndex < total - 1) {
-                                    setCurrentIndex(prev => prev + 1);
+                                if (safeIndex < total - 1) {
+                                    setCurrentIndex(safeIndex + 1);
                                     window.navigator.vibrate?.(10);
                                 }
                             }}
@@ -281,7 +281,7 @@ export function OrdersPage() {
                         
                         <div className="mt-4 flex flex-col items-center bg-white px-2.5 py-1.5 rounded-xl shadow-sm border border-stone-100">
                             <span className="text-[11px] font-[900] text-stone-900 tabular-nums leading-none">
-                                {currentIndex + 1}
+                                {safeIndex + 1}
                             </span>
                             <div className="w-4 h-[1px] bg-stone-100 my-1" />
                             <span className="text-[8px] font-bold text-stone-300 uppercase tracking-widest leading-none">
@@ -298,7 +298,7 @@ export function OrdersPage() {
                     >
                         <AnimatePresence mode="popLayout">
                             <motion.div
-                                key={`${activeTab}-${currentIndex}`}
+                                key={`${activeTab}-${safeIndex}`}
                                 initial={{ y: "10%" , opacity: 0, scale: 0.95 }}
                                 animate={{ y: 0, opacity: 1, scale: 1 }}
                                 exit={{ y: "-10%", opacity: 0, scale: 0.95 }}
@@ -306,9 +306,9 @@ export function OrdersPage() {
                                 className="absolute inset-0"
                             >
                                 <OrderCard
-                                    order={displayOrders[currentIndex]}
-                                    tableName={getTableName(displayOrders[currentIndex])}
-                                    indexLabel={`${currentIndex + 1} / ${total}`}
+                                    order={displayOrders[safeIndex]}
+                                    tableName={getTableName(displayOrders[safeIndex])}
+                                    indexLabel={`${safeIndex + 1} / ${total}`}
                                 />
                             </motion.div>
                         </AnimatePresence>

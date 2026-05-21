@@ -66,6 +66,7 @@ export function SettingsPage() {
                             label="Permissions"
                             value="Manage Roles"
                             onClick={() => {}}
+                            disabled={true}
                         />
                     </SettingGroup>
                 )}
@@ -77,18 +78,21 @@ export function SettingsPage() {
                         label="Notifications"
                         value="Enabled"
                         onClick={() => {}}
+                        disabled={true}
                     />
                     <SettingItem 
                         icon={<Palette size={18} />}
                         label="Appearance"
                         value="System Default"
                         onClick={() => {}}
+                        disabled={true}
                     />
                     <SettingItem 
                         icon={<Languages size={18} />}
                         label="Language"
                         value="English (US)"
                         onClick={() => {}}
+                        disabled={true}
                     />
                 </SettingGroup>
 
@@ -98,6 +102,7 @@ export function SettingsPage() {
                         icon={<HelpCircle size={18} />}
                         label="Help Center"
                         onClick={() => {}}
+                        disabled={true}
                     />
                 </SettingGroup>
 

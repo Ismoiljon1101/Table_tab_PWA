@@ -85,14 +85,15 @@ export function useTableDrag({ canvasRef, panRef, ghostRef, onDropped, onRotate 
         pointerIdRef.current = pointerId;
         wasLongPressedRef.current = false; // Reset for each new touch
 
+        // iOS Safari: Capture pointer synchronously on pointerdown
+        if (canvasRef.current) {
+            try { canvasRef.current.setPointerCapture(pointerId); } catch { /* ignored */ }
+        }
+
         // Stage 1: Drag Activation (500ms)
         longPressTimer.current = setTimeout(() => {
             wasLongPressedRef.current = true; // Mark: suppress next click
             setDragging({ table, initialX: clientX, initialY: clientY });
-
-            if (canvasRef.current && pointerIdRef.current !== null) {
-                try { canvasRef.current.setPointerCapture(pointerIdRef.current); } catch { /* ignored */ }
-            }
 
             // Stage 2: Rotation Trigger (+500ms more = 1000ms total)
             rotateTimer.current = setTimeout(() => {
@@ -122,9 +123,12 @@ export function useTableDrag({ canvasRef, panRef, ghostRef, onDropped, onRotate 
     const cancelLongPress = useCallback(() => {
         if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
         if (rotateTimer.current)   { clearTimeout(rotateTimer.current);   rotateTimer.current   = null; }
+        if (canvasRef.current && pointerIdRef.current !== null) {
+            try { canvasRef.current.releasePointerCapture(pointerIdRef.current); } catch { /* already released */ }
+        }
         pressPosRef.current = null;
         pointerIdRef.current = null;
-    }, []);
+    }, [canvasRef]);
 
     /**
      * GPU-accelerated drag move.
@@ -180,7 +184,7 @@ export function useTableDrag({ canvasRef, panRef, ghostRef, onDropped, onRotate 
         onDragMove,
         onDragEnd,
         isDragging: dragging !== null,
-        /** True if a long-press (drag/rotate) activated — caller should skip the next click */
-        ignoreNextTap: wasLongPressedRef.current,
+        /** Function returning true if a long-press activated — caller should skip the next click */
+        shouldIgnoreNextTap: () => wasLongPressedRef.current,
     };
 }

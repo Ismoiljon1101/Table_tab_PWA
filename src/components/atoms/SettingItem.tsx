@@ -10,6 +10,7 @@ interface SettingItemProps {
     className?: string;
     showChevron?: boolean;
     variant?: 'default' | 'danger';
+    disabled?: boolean;
 }
 
 /**
@@ -24,26 +25,20 @@ export function SettingItem({
     rightElement,
     className = '',
     showChevron = true,
-    variant = 'default'
+    variant = 'default',
+    disabled = false
 }: SettingItemProps) {
-    const isClickable = !!onClick;
+    const isClickable = !!onClick && !disabled;
     const textColor = variant === 'danger' ? 'text-red-500' : 'text-stone-700';
     const iconColor = variant === 'danger' ? 'bg-red-50 text-red-500' : 'bg-stone-50 text-stone-500';
 
-    return (
-        <div
-            onClick={onClick}
-            className={`
-                flex items-center gap-3 px-4 py-3.5 min-h-[52px] transition-all duration-150
-                ${isClickable ? 'active:bg-stone-100 active:scale-[0.98] cursor-pointer' : ''}
-                ${className}
-            `}
-        >
+    const innerContent = (
+        <>
             <div className={`flex items-center justify-center flex-shrink-0 w-8 h-8 rounded-lg ${iconColor}`}>
                 {icon}
             </div>
             
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 text-left min-w-0">
                 <p className={`text-sm font-medium truncate ${textColor}`}>
                     {label}
                 </p>
@@ -64,6 +59,32 @@ export function SettingItem({
                     <ChevronRight size={16} className="text-stone-300" />
                 )}
             </div>
+        </>
+    );
+
+    const baseClass = `
+        flex items-center gap-3 px-4 py-3.5 min-h-[52px] w-full transition-all duration-150
+        ${isClickable ? 'active:bg-stone-100 active:scale-[0.98] cursor-pointer' : ''}
+        ${disabled ? 'opacity-40 cursor-not-allowed' : ''}
+        ${className}
+    `;
+
+    if (onClick) {
+        return (
+            <button
+                type="button"
+                onClick={disabled ? undefined : onClick}
+                disabled={disabled}
+                className={baseClass}
+            >
+                {innerContent}
+            </button>
+        );
+    }
+
+    return (
+        <div className={baseClass}>
+            {innerContent}
         </div>
     );
 }

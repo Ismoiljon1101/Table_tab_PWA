@@ -12,6 +12,7 @@ import { useAuthStore } from '../../stores/authStore';
 import api from '../../services/api';
 import type { MenuItem, Category } from '../../types';
 import { MenuSkeleton } from '../../components/atoms/MenuSkeleton';
+import { formatCurrency } from '../../utils/format';
 
 /**
  * MenuPage
@@ -109,7 +110,7 @@ export function MenuPage() {
                 </div>
                 <span>View Cart</span>
             </div>
-            <span className="text-lg uppercase">Total: {cart.totalItems()}</span>
+            <span className="text-lg uppercase">Total: {formatCurrency(cart.subtotal())}</span>
         </motion.button>
     ) : null;
 

@@ -127,7 +127,7 @@ export function FloorPlanCanvas({
         }
     };
 
-    const { dragging, onTableTouchStart, handleMove, cancelLongPress, onDragMove, onDragEnd, isDragging, ignoreNextTap } = useTableDrag({
+    const { dragging, onTableTouchStart, handleMove, cancelLongPress, onDragMove, onDragEnd, isDragging, shouldIgnoreNextTap } = useTableDrag({
         canvasRef,
         panRef,
         ghostRef,
@@ -188,7 +188,7 @@ export function FloorPlanCanvas({
         dragStartRef.current = null;
 
         // Momentum — decelerate with friction
-        let { vx, vy } = velocityRef.current;
+        const { vx, vy } = velocityRef.current;
         const speed = Math.sqrt(vx * vx + vy * vy);
         if (speed < 0.1) { persistPan(); return; }
 
@@ -237,10 +237,11 @@ export function FloorPlanCanvas({
         <div
             ref={canvasRef}
             className="relative w-full h-full overflow-hidden bg-[#fafafa] rounded-3xl border border-stone-200/60 shadow-[inset_0_2px_10px_rgba(0,0,0,0.01)] cursor-grab active:cursor-grabbing select-none touch-none"
+            style={{ transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)', willChange: 'transform' }}
             onPointerDown={handleCanvasPointerDown}
             onPointerMove={handleCanvasPointerMove}
             onPointerUp={handleCanvasPointerUp}
-            onPointerLeave={handleCanvasPointerUp}
+            onPointerCancel={handleCanvasPointerUp}
         >
             {/* ── HYBRID GRID SYSTEM (dots + subtle lines) ── */}
             <div
@@ -300,7 +301,7 @@ export function FloorPlanCanvas({
                             panY={0}
                             isAdmin={isAdmin}
                             isDraggingThis={false}
-                            onClick={() => !isDragging && !ignoreNextTap && onTableTap(table)}
+                            onClick={() => !isDragging && !shouldIgnoreNextTap() && onTableTap(table)}
                             onLongPressStart={(cx, cy, pid) => isAdmin && onTableTouchStart(table, cx, cy, pid)}
                             onLongPressCancel={cancelLongPress}
                         />

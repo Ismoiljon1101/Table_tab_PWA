@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { LayoutGrid, UtensilsCrossed, ShoppingCart, ClipboardList, Settings, Bell, Search, X } from 'lucide-react';
@@ -6,7 +6,6 @@ import { CartBottomSheet } from '../organisms/CartBottomSheet';
 import { ToastContainer } from '../atoms/ToastContainer';
 import { useToast } from '../../stores/toastStore';
 import api from '../../services/api';
-import type { Table } from '../../types';
 import { useAuthStore } from '../../stores/authStore';
 import { useCartStore } from '../../stores/cartStore';
 import { useSearchStore } from '../../stores/searchStore';
@@ -17,7 +16,6 @@ import { shapeIntoMongoId } from '../../libs/mongoId';
  * Wraps all authenticated pages.
  */
 export function AppShell() {
-    const user = useAuthStore((s) => s.user);
     const restaurant = useAuthStore((s) => s.restaurant);
     const cartCount = useCartStore((s) => s.totalItems());
     const search = useSearchStore();
@@ -42,7 +40,7 @@ export function AppShell() {
         if (!location.pathname.startsWith('/menu')) {
             search.closeSearch();
         }
-    }, [location.pathname]);
+    }, [location.pathname, search]);
 
     const currentFloorName = useAuthStore((s) => s.currentFloorName);
     const isFloorPage = location.pathname === '/';
@@ -68,7 +66,7 @@ export function AppShell() {
 
             const payload = {
                 tableId: cleanTableId,
-                items: cart.items.map((item: any) => ({
+                items: cart.items.map((item) => ({
                     menuItemId: shapeIntoMongoId(item.menuItemId),
                     name: item.name,
                     quantity: item.quantity,
@@ -96,9 +94,10 @@ export function AppShell() {
 
             // Navigate via React Router — keeps app alive, preserves all cache
             navigate('/');
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('Failed to save order:', err);
-            const raw = err?.response?.data?.message;
+            const errorData = err as { response?: { data?: { message?: string | string[] } } };
+            const raw = errorData.response?.data?.message;
             const message = Array.isArray(raw) ? raw[0] : (raw || 'Failed to place order. Try again.');
             toast.error(message);
         } finally {
@@ -114,16 +113,18 @@ export function AppShell() {
                     {search.isSearchVisible ? (
                         <div className="flex-1 flex items-center bg-stone-50 rounded-xl px-3 animate-fade-in group focus-within:bg-white focus-within:ring-1 focus-within:ring-amber-200 transition-all">
                             <Search size={16} className="text-stone-400 group-focus-within:text-amber-600 transition-colors" />
-                            <input
+                             <input
                                 autoFocus
                                 type="text"
                                 value={search.query}
                                 onChange={(e) => search.setQuery(e.target.value)}
                                 placeholder="Search dishes..."
+                                aria-label="Search dishes"
                                 className="w-full h-8 bg-transparent border-none text-sm focus:outline-none px-2 text-stone-900"
                             />
                             <button 
                                 onClick={search.toggleSearch}
+                                aria-label="Close search"
                                 className="text-stone-300 hover:text-stone-600 active:scale-90 transition-all"
                             >
                                 <X size={16} />
@@ -139,6 +140,7 @@ export function AppShell() {
                                 <button
                                     className="w-9 h-9 flex items-center justify-center rounded-xl bg-stone-50 text-stone-400 active:bg-amber-50 active:text-amber-600 transition-all"
                                     onClick={search.toggleSearch}
+                                    aria-label="Search dishes"
                                 >
                                     <Search size={20} strokeWidth={2.5} />
                                 </button>
@@ -147,6 +149,7 @@ export function AppShell() {
                             <button
                                 className={`w-9 h-9 flex items-center justify-center rounded-xl transition-all group ${location.pathname === '/orders' ? 'bg-amber-50 text-amber-600' : 'bg-stone-50 text-stone-400 active:bg-stone-100'}`}
                                 title="Orders"
+                                aria-label="Orders"
                                 onClick={() => navigate('/orders')}
                             >
                                 <ClipboardList size={20} strokeWidth={2.5} />
@@ -157,10 +160,10 @@ export function AppShell() {
                     <button
                         className="relative w-9 h-9 flex items-center justify-center rounded-xl bg-stone-50 text-stone-400 active:bg-stone-100 active:text-amber-600 transition-all group"
                         title="Notifications"
+                        aria-label="Notifications"
                         onClick={() => navigate('/notifications')}
                     >
                         <Bell size={20} strokeWidth={2.5} className="group-active:scale-110 transition-transform" />
-                        <span className="absolute top-2 right-2 w-2 h-2 bg-amber-600 rounded-full border-2 border-white animate-pulse" />
                     </button>
                 </header>
             )}
@@ -170,8 +173,8 @@ export function AppShell() {
                 <Outlet />
             </main>
 
-            {/* Bottom Navigation - Fixed 10% of Viewport Height (Safe Area Aware) */}
-            <nav className="h-[10vh] pb-[env(safe-area-inset-bottom,16px)] flex items-center justify-around bg-white border-t border-stone-100 z-50">
+            {/* Bottom Navigation - Fixed Height (Safe Area Aware) */}
+            <nav className="h-[calc(60px+env(safe-area-inset-bottom,0px))] pb-[env(safe-area-inset-bottom,0px)] flex items-center justify-around bg-white border-t border-stone-100 z-50">
                 <NavLink
                     to="/"
                     end
@@ -182,8 +185,7 @@ export function AppShell() {
                 </NavLink>
 
                 <NavLink
-                    to="/admin/manage"
-                    state={{ activeTab: 'items' }}
+                    to="/menu"
                     className={({ isActive }) => `flex flex-col items-center gap-0.5 px-4 py-1 text-[11px] font-medium transition-colors duration-150 active:scale-95 ${isActive ? 'text-amber-600' : 'text-stone-400'}`}
                 >
                     <UtensilsCrossed size={22} />
@@ -193,6 +195,7 @@ export function AppShell() {
                 <button
                     onClick={() => setIsCartOpen(true)}
                     className={`relative flex flex-col items-center gap-0.5 px-4 py-1 text-[11px] font-medium transition-colors duration-150 active:scale-95 ${isCartOpen ? 'text-amber-600' : 'text-stone-400'}`}
+                    aria-label="View Cart"
                 >
                     <div className="relative">
                         <ShoppingCart size={22} />

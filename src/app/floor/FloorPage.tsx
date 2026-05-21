@@ -20,6 +20,7 @@ export function FloorPage() {
     const navigate = useNavigate();
     const toast = useToast();
     const user = useAuthStore((s) => s.user);
+    const restaurant = useAuthStore((s) => s.restaurant);
     const currentFloorName = useAuthStore((s) => s.currentFloorName);
     const setCurrentFloorName = useAuthStore((s) => s.setCurrentFloorName);
     const cart = useCartStore();
@@ -29,6 +30,7 @@ export function FloorPage() {
     const [pendingTable, setPendingTable] = useState<Table | null>(null);
     const [cancelConfirmTable, setCancelConfirmTable] = useState<Table | null>(null);
     const [isActionLoading, setIsActionLoading] = useState(false);
+    const [resetKey, setResetKey] = useState(0);
 
     const isAdmin = user?.role === UserRole.OWNER || user?.role === UserRole.ADMIN;
 
@@ -219,15 +221,18 @@ export function FloorPage() {
 
     if (apiError) {
         return (
-            <div className="flex flex-col items-start gap-3 m-4 p-5 bg-red-50 border border-red-200 rounded-3xl text-sm shadow-sm">
-                <div className="flex items-center gap-2 text-red-700 font-bold">
-                    <span>⚠️ Connection Failure</span>
+            <div className="flex flex-col items-center gap-4 m-4 p-6 bg-white border border-stone-200 rounded-3xl text-center shadow-lg animate-fade-in">
+                <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-600 text-xl font-bold">
+                    ⚠️
                 </div>
-                <div className="w-full bg-white/50 p-3 rounded-xl border border-red-100 font-mono text-[11px] text-red-600 overflow-auto max-h-[200px]">
-                    {(apiError as any).message || 'Server unreachable'}
+                <div className="flex flex-col gap-1">
+                    <h3 className="text-lg font-bold text-stone-900">Unable to load floor plan</h3>
+                    <p className="text-xs text-stone-500 max-w-[240px] mx-auto">
+                        The server might be temporarily offline or there is a connection issue. We will try to reconnect when you retry.
+                    </p>
                 </div>
                 <button
-                    className="w-full py-3 bg-red-600 text-white font-semibold rounded-2xl"
+                    className="w-full py-3 bg-amber-600 text-white font-semibold rounded-2xl active:scale-95 transition-transform"
                     onClick={() => queryClient.invalidateQueries({ queryKey: ['tables'] })}
                 >
                     Retry Connection
@@ -246,8 +251,15 @@ export function FloorPage() {
             <div className="px-4 py-2 border-t border-stone-100 flex justify-between items-center">
                 <span className="text-[9px] text-stone-400">Status: {tables.length} tables found</span>
                 <button 
-                    onClick={() => { localStorage.removeItem(`floor_pan_${user?.restaurantId}`); window.location.reload(); }}
-                    className="text-[10px] uppercase tracking-widest font-bold text-stone-400"
+                    onClick={() => {
+                        try {
+                            localStorage.removeItem(`floor_pan_${restaurant?._id || 'default'}`);
+                        } catch { /* ignore */ }
+                        queryClient.invalidateQueries({ queryKey: ['tables'] });
+                        setResetKey(prev => prev + 1);
+                        toast.success('Floor plan view reset ✓');
+                    }}
+                    className="text-[10px] uppercase tracking-widest font-bold text-stone-400 active:scale-95 transition-transform"
                 >
                     Reset View
                 </button>
@@ -276,6 +288,7 @@ export function FloorPage() {
                 </div>
             ) : (
                 <FloorPlanCanvas
+                    key={resetKey}
                     tables={displayedTables}
                     isAdmin={isAdmin}
                     onTableTap={handleTableTap}

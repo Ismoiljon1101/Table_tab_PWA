@@ -14,7 +14,7 @@ export function AdminDashboardTemplate({ header, tabs, children }: AdminDashboar
     return (
         <div className="flex flex-col h-full bg-stone-50/30 overflow-hidden">
             {/* Template-level header section - Sticky at very top since AppShell header is hidden */}
-            <div className="sticky top-0 z-40 bg-white border-b border-stone-100">
+            <div className="sticky top-0 z-40 bg-white border-b border-stone-100 pt-[env(safe-area-inset-top)]">
                 {header}
                 {tabs}
             </div>
