@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => {
       tailwindcss(),
       react(),
       VitePWA({
+        // Recovery mode: publish a self-destroying worker so mobile clients can
+        // clear stale precached HTML/assets instead of staying pinned to a blank screen.
+        selfDestroying: true,
         registerType: 'autoUpdate',
         includeAssets: ['favicon.svg', 'icons/*.png'],
         manifest: {
@@ -90,4 +93,3 @@ export default defineConfig(({ mode }) => {
 
   };
 })
-

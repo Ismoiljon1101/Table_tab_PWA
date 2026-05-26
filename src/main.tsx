@@ -4,17 +4,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import './styles/global.css'
 import App from './App'
 
-// CRITICAL CHAOS KILLER: Force unregister any lingering Service Workers.
-// The browser might hold onto 'workbox' even if it's disabled in Vite.
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const registration of registrations) {
-      registration.unregister();
-      console.log('🗑️ [Chaos Killer] Unregistered ghost Service Worker', registration);
-    }
-  });
-}
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
